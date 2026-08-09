@@ -5,6 +5,29 @@ updates:
     schedule:
       interval: monthly
     open-pull-requests-limit: 5
+    groups:
+      compatible-runtime:
+        dependency-type: production
+        patterns:
+          - "dotenv"
+          - "ioredis"
+        update-types:
+          - "minor"
+          - "patch"
+      compatible-test-tooling:
+        dependency-type: development
+        patterns:
+          - "vitest"
+        update-types:
+          - "minor"
+          - "patch"
+    ignore:
+      - dependency-name: "prisma"
+        update-types:
+          - "version-update:semver-major"
+      - dependency-name: "@prisma/client"
+        update-types:
+          - "version-update:semver-major"
 
   - package-ecosystem: github-actions
     directory: /
