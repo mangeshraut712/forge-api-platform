@@ -24,7 +24,7 @@
     "lint": "echo \"no lint yet\""
   },
   "dependencies": {
-    "@prisma/client": "^6.5.0",
+    "@prisma/client": "^7.9.1",
     "dotenv": "^16.6.1"
   },
   "devDependencies": {
