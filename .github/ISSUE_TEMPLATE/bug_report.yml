@@ -1,0 +1,43 @@
+name: Bug report
+description: Report a reproducible problem in ForgeAPI Platform
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a problem. Please remove secrets and personal data from all examples.
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What happened, and what did you expect to happen?
+      placeholder: Describe the observed and expected behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction steps
+      description: Provide the smallest reliable reproduction.
+      placeholder: |
+        1. Start ...
+        2. Send ...
+        3. Observe ...
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Include Node.js, pnpm, operating system, and relevant package versions.
+      placeholder: Node 22.x, pnpm 9.x, macOS/Linux/Windows
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or response
+      description: Paste relevant logs or API responses. Remove credentials and tokens.
+      render: shell
+    validations:
+      required: false

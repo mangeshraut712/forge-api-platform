@@ -1,0 +1,36 @@
+{
+  "name": "forge-api-platform",
+  "private": true,
+  "version": "0.1.0",
+  "description": "ForgeAPI — issue keys, enforce quotas, ship a typed SDK",
+  "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=22 <23"
+  },
+  "scripts": {
+    "dev": "turbo run dev --parallel",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "lint": "pnpm format:check",
+    "typecheck": "turbo run typecheck",
+    "db:generate": "pnpm --filter @forge/db generate",
+    "db:migrate": "pnpm --filter @forge/db migrate:dev",
+    "db:push": "pnpm --filter @forge/db push",
+    "db:seed": "pnpm --filter @forge/db seed",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "format": "prettier --write \"**/*.{ts,tsx,mjs,md,json,yml,yaml}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,mjs,md,json,yml,yaml}\""
+  },
+  "pnpm": {
+    "overrides": {
+      "postcss": "8.5.26",
+      "sharp": "0.35.3"
+    }
+  },
+  "devDependencies": {
+    "prettier": "^3.5.3",
+    "turbo": "^2.5.0",
+    "typescript": "^5.8.2"
+  }
+}

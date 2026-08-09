@@ -1,0 +1,22 @@
+node_modules
+.turbo
+dist
+.next
+.out
+coverage
+.env
+.env.local
+.env.*.local
+*.log
+.DS_Store
+.vercel
+playwright-report
+test-results
+packages/db/prisma/*.db
+packages/db/prisma/*.db-journal
+*.tsbuildinfo
+.pnpm-store
+
+
+#Ignore vscode AI rules
+.github/instructions/codacy.instructions.md
