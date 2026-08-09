@@ -19,7 +19,7 @@
     "@forge/shared": "workspace:*",
     "dotenv": "^16.6.1",
     "fastify": "^5.2.1",
-    "ioredis": "^5.4.2",
+    "ioredis": "^6.0.0",
     "zod": "^3.24.2"
   },
   "devDependencies": {
