@@ -15,7 +15,7 @@
     "@forge/auth": "workspace:*",
     "@forge/db": "workspace:*",
     "@forge/shared": "workspace:*",
-    "next": "^15.2.2",
+    "next": "^16.3.0",
     "next-auth": "^4.24.11",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
