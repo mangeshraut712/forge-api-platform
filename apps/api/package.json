@@ -13,7 +13,7 @@
     "lint": "echo \"no lint yet\""
   },
   "dependencies": {
-    "@fastify/cors": "^10.0.1",
+    "@fastify/cors": "^11.3.0",
     "@forge/auth": "workspace:*",
     "@forge/db": "workspace:*",
     "@forge/shared": "workspace:*",
