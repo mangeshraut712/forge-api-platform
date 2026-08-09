@@ -2,13 +2,61 @@
 
 [![CI](https://github.com/mangeshraut712/forge-api-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/mangeshraut712/forge-api-platform/actions/workflows/ci.yml)
 
-A full-stack API platform with scoped API keys, Redis-backed quotas, idempotent REST APIs, a Next.js control plane, and a typed TypeScript SDK.
+A self-hosted API-platform starter for teams that need secure API keys, scoped access, quotas, idempotent writes, request tracing, and a typed client without assembling those primitives from scratch.
 
-ForgeAPI is a developer-focused monorepo that demonstrates how to build an API platform with authentication, project management, API key lifecycle controls, quota enforcement, request logging, and a typed client experience.
+ForgeAPI is built for platform engineers, backend developers, and small teams building internal, partner, multi-tenant, or AI/tool APIs. It is also a concrete reference project for understanding how these concerns fit together.
 
-> Current status: Early-stage reference implementation. The Todo API is the current example resource.
+> Current status: Early-stage reference implementation. The Todo API is the example resource; ForgeAPI is not a hosted SaaS product.
 
-## Features
+## Why ForgeAPI
+
+Most teams eventually need the same API foundation:
+
+- Give each service, tenant, or partner its own credentials.
+- Limit usage without scattering quota logic across application code.
+- Make retries safe when networks fail or clients time out.
+- Show developers how to authenticate, handle errors, and use a typed client.
+- Keep enough request context to investigate failures.
+
+ForgeAPI packages those concerns into one runnable control plane, data plane, database, quota store, and SDK so a team can start from a working boundary instead of a blank repository.
+
+## Who should use it
+
+ForgeAPI is a good starting point for:
+
+- Internal APIs shared by multiple services or teams
+- Partner and integration APIs with scoped credentials and rotation
+- Multi-tenant SaaS APIs with per-project quotas
+- AI and tool backends that need typed clients, retries, and idempotent writes
+
+It is not the right choice yet if you need a hosted API gateway, billing-grade metering, a complete OpenAPI portal, multi-region operations, or a turnkey production deployment.
+
+See [use cases](docs/use-cases.md), [production-readiness guidance](docs/production-readiness.md), and the [roadmap](ROADMAP.md) before adopting it for an external customer-facing API.
+
+## Choose your path
+
+| If you want to...                          | Start here                                                |
+| ------------------------------------------ | --------------------------------------------------------- |
+| Run a working API platform locally         | Follow the [5-minute quick start](#quick-start)           |
+| See the SDK and retry/idempotency behavior | Run <code>pnpm demo</code>                                |
+| Understand the system boundary             | Read [the architecture](docs/architecture.md)             |
+| Decide whether it fits your product        | Read [the use cases](docs/use-cases.md)                   |
+| Plan a real deployment                     | Read [production readiness](docs/production-readiness.md) |
+| Contribute or extend the example           | Read [CONTRIBUTING.md](CONTRIBUTING.md)                   |
+
+## Core capabilities
+
+| Capability                | User value                                                     |
+| ------------------------- | -------------------------------------------------------------- |
+| Project-scoped API keys   | Give services and partners isolated credentials                |
+| Scopes and key rotation   | Reduce blast radius and support safe credential changes        |
+| Redis-backed quotas       | Apply plan limits consistently per project                     |
+| Transactional idempotency | Make retryable writes safe during network failures             |
+| Request IDs and logs      | Trace a request across client, API, and persistence            |
+| Typed zero-dependency SDK | Give TypeScript consumers a fast, predictable integration path |
+| Dashboard control plane   | Manage projects, keys, usage, and request activity             |
+
+## Detailed features
 
 - API key creation, revocation, expiration, and rotation
 - Separate test and live API key environments
@@ -177,7 +225,7 @@ Run applications individually when needed:
 ```bash
 pnpm --filter @forge/api dev
 pnpm --filter @forge/dashboard dev
-pnpm --filter @forge/todo-demo dev
+pnpm demo
 ```
 
 ## API
@@ -322,6 +370,7 @@ Use <code>open</code> to prioritize availability or <code>closed</code> to prior
 
 ```bash
 pnpm dev                 # Start the API, dashboard, and demo
+pnpm demo                # Run the end-to-end Todo SDK demo
 pnpm build               # Build all packages and applications
 pnpm test                # Run the test suite
 pnpm typecheck           # Type-check the monorepo
@@ -400,7 +449,7 @@ The workflow performs:
 
 ## Project status
 
-The current implementation uses the Todo resource to demonstrate the platform lifecycle. The architecture is intended to support additional API resources, dashboard views, plans, and integrations over time.
+The current implementation uses the Todo resource to demonstrate the platform lifecycle. The architecture is intended to support additional API resources, dashboard views, plans, and integrations over time. See the [roadmap](ROADMAP.md) and [production-readiness guide](docs/production-readiness.md) for the intended adoption path and current boundaries.
 
 ## Contributing
 

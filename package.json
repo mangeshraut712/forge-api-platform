@@ -9,6 +9,7 @@
   },
   "scripts": {
     "dev": "turbo run dev --parallel",
+    "demo": "pnpm --filter @forge/todo-demo dev",
     "build": "turbo run build",
     "test": "turbo run test",
     "lint": "pnpm format:check",
