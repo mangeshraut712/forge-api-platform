@@ -41,6 +41,9 @@ updates:
       - dependency-name: "next"
         update-types:
           - "version-update:semver-major"
+      - dependency-name: "@fastify/cors"
+        update-types:
+          - "version-update:semver-major"
 
   - package-ecosystem: github-actions
     directory: /
