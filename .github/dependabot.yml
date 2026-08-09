@@ -28,6 +28,19 @@ updates:
       - dependency-name: "@prisma/client"
         update-types:
           - "version-update:semver-major"
+      # Major upgrades are coordinated migrations, not automatic dependency bumps.
+      - dependency-name: "typescript"
+        update-types:
+          - "version-update:semver-major"
+      - dependency-name: "zod"
+        update-types:
+          - "version-update:semver-major"
+      - dependency-name: "@types/node"
+        update-types:
+          - "version-update:semver-major"
+      - dependency-name: "next"
+        update-types:
+          - "version-update:semver-major"
 
   - package-ecosystem: github-actions
     directory: /
