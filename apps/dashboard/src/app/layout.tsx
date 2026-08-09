@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import Providers from "@/components/session-provider";
+import SignOutButton from "@/components/sign-out-button";
 
 export const metadata: Metadata = {
   title: "ForgeAPI Dashboard",
@@ -22,7 +23,7 @@ export default function RootLayout({
             </a>
             <div className="nav-links">
               <a href="/projects">Projects</a>
-              <a href="/api/auth/signout">Sign out</a>
+              <SignOutButton />
             </div>
           </nav>
           <main className="container">{children}</main>

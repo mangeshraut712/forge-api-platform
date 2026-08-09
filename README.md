@@ -379,6 +379,7 @@ pnpm format              # Format supported source files
 pnpm db:generate         # Generate the Prisma client
 pnpm db:push             # Apply the schema to the local database
 pnpm db:migrate          # Create and apply a development migration
+pnpm db:migrate:deploy   # Apply checked-in migrations to a deployment database
 pnpm db:seed             # Seed local development data
 pnpm docker:up           # Start PostgreSQL and Redis
 pnpm docker:down         # Stop PostgreSQL and Redis
@@ -416,6 +417,11 @@ Important production values include:
 - Google OAuth credentials if Google login is enabled
 
 Never commit <code>.env</code>, API keys, OAuth secrets, or database credentials.
+
+For a deployment database, set <code>DATABASE_URL</code> in the deployment
+environment and run <code>pnpm db:migrate:deploy</code>. The repository includes
+an initial Prisma migration; use <code>pnpm db:push</code> only for local
+schema prototyping.
 
 ## Security model
 

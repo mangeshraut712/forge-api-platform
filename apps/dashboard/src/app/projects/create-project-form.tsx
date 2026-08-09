@@ -70,7 +70,7 @@ export default function CreateProjectForm() {
         }}
         placeholder="my-app"
         required
-        pattern="[a-z0-9-]{2,}"
+        pattern={"[a-z0-9\\-]{2,}"}
         title="Lowercase letters, numbers, and hyphens (min 2 chars)"
       />
       <button type="submit" className="btn" disabled={loading}>

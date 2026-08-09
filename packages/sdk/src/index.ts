@@ -210,7 +210,7 @@ export class ForgeClient {
           signal: controller.signal,
           headers: {
             Authorization: `Bearer ${this.apiKey}`,
-            "Content-Type": "application/json",
+            ...(init?.body ? { "Content-Type": "application/json" } : {}),
             ...(init?.headers ?? {}),
           },
           ...(init?.body ? { body: init.body } : {}),

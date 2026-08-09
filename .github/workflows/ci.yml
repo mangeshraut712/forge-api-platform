@@ -19,6 +19,34 @@ jobs:
     name: Build, typecheck, lint, and test (Node ${{ matrix.node-version }})
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      DATABASE_URL: postgresql://forge:forge@localhost:5432/forge?schema=public
+      REDIS_URL: redis://localhost:6379
+      API_KEY_HASH_PEPPER: ci-only-pepper-not-a-secret
+      NODE_ENV: test
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: forge
+          POSTGRES_PASSWORD: forge
+          POSTGRES_DB: forge
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U forge -d forge"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     strategy:
       matrix:
         node-version: [22]
@@ -45,6 +73,9 @@ jobs:
 
       - name: Generate Prisma client
         run: pnpm db:generate
+
+      - name: Verify deployment migrations
+        run: pnpm db:migrate:deploy
 
       - name: Lint and format check
         run: pnpm lint

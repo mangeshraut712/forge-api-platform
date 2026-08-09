@@ -12,6 +12,7 @@ coverage
 .vercel
 playwright-report
 test-results
+.playwright-cli
 packages/db/prisma/*.db
 packages/db/prisma/*.db-journal
 *.tsbuildinfo

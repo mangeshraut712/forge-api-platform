@@ -16,6 +16,7 @@
     "typecheck": "turbo run typecheck",
     "db:generate": "pnpm --filter @forge/db generate",
     "db:migrate": "pnpm --filter @forge/db migrate:dev",
+    "db:migrate:deploy": "pnpm --filter @forge/db migrate:deploy",
     "db:push": "pnpm --filter @forge/db push",
     "db:seed": "pnpm --filter @forge/db seed",
     "docker:up": "docker compose up -d",

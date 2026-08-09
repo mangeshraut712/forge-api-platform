@@ -223,6 +223,11 @@ describe("ForgeClient", () => {
     });
 
     await expect(client.deleteTodo("todo-1")).resolves.toBeUndefined();
+
+    const callArgs = (fetchFn as unknown as ReturnType<typeof vi.fn>).mock
+      .calls[0];
+    const opts = callArgs?.[1] as RequestInit;
+    expect(opts.headers).not.toHaveProperty("Content-Type");
   });
 
   it("uses custom base URL", async () => {

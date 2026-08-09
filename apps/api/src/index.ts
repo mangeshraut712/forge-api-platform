@@ -29,16 +29,19 @@ async function buildServer() {
   });
 
   // Plugins (order matters)
-  await app.register(corsPlugin);
-  await app.register(requestIdPlugin);
-  await app.register(authPlugin);
-  await app.register(requestLoggerPlugin);
-  await app.register(quotaPlugin);
-  await app.register(errorHandlerPlugin);
+  // Call the local plugins directly so their hooks are attached to the root
+  // instance. Registering them as sibling plugins would encapsulate the hooks
+  // before the routes are registered below.
+  await corsPlugin(app);
+  await requestIdPlugin(app);
+  await authPlugin(app);
+  await requestLoggerPlugin(app);
+  await quotaPlugin(app);
+  await errorHandlerPlugin(app);
 
   // Routes
-  await app.register(healthRoutes);
-  await app.register(todoRoutes);
+  await healthRoutes(app);
+  await todoRoutes(app);
 
   return app;
 }
