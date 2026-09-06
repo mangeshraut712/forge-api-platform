@@ -19,6 +19,10 @@ Include enough information to reproduce the issue, including:
 
 Please allow reasonable time for investigation and remediation before making the issue public.
 
+## Dependency updates
+
+Dependabot version updates and Dependabot security updates are disabled for this repository. Automated updater jobs were failing (for example when a security fix required a major bump that could not be applied automatically). Dependency changes are reviewed and applied manually, using the same install, audit, and CI checks as other code changes.
+
 ## Local development safety
 
 - Never commit <code>.env</code> files or credentials.
