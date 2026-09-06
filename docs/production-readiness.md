@@ -4,19 +4,19 @@ ForgeAPI is a reference implementation, not a hosted production service. This pa
 
 ## Implemented in this repository
 
-| Area                | Evidence                                                                                                          |
-| ------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| API-key protection  | Raw keys are shown once; hashes use a server-side pepper; test/live formats are validated                         |
-| Authorization       | Keys are project-scoped and routes require explicit scopes                                                        |
-| Project isolation   | Todo reads and writes are filtered by project; dashboard actions check ownership                                  |
-| Key lifecycle       | Create, revoke, expire, and rotate operations are represented                                                     |
-| Quotas              | Redis-backed daily/monthly plan windows and rate-limit headers                                                    |
-| Retry safety        | POST, PUT, and PATCH Todo writes support transactional idempotency                                                |
-| Request context     | Request IDs are generated or accepted, returned in errors, and stored with request logs                           |
-| Input limits        | Zod schemas are strict and the API has a request body limit                                                       |
-| Health signals      | Liveness and PostgreSQL/Redis readiness endpoints are available                                                   |
-| Delivery checks     | GitHub Actions runs install, Prisma generation, formatting, typechecking, build, and tests                        |
-| Repository security | Secret scanning, push protection, protected main, and SHA-pinned actions are enabled. Dependabot version and security updates are disabled; dependency bumps are applied manually |
+| Area                | Evidence                                                                                                      |
+| ------------------- | ------------------------------------------------------------------------------------------------------------- |
+| API-key protection  | Raw keys are shown once; hashes use a server-side pepper; test/live formats are validated                     |
+| Authorization       | Keys are project-scoped and routes require explicit scopes                                                    |
+| Project isolation   | Todo reads and writes are filtered by project; dashboard actions check ownership                              |
+| Key lifecycle       | Create, revoke, expire, and rotate operations are represented                                                 |
+| Quotas              | Redis-backed daily/monthly plan windows and rate-limit headers                                                |
+| Retry safety        | POST, PUT, and PATCH Todo writes support transactional idempotency                                            |
+| Request context     | Request IDs are generated or accepted, returned in errors, and stored with request logs                       |
+| Input limits        | Zod schemas are strict and the API has a request body limit                                                   |
+| Health signals      | Liveness and PostgreSQL/Redis readiness endpoints are available                                               |
+| Delivery checks     | GitHub Actions runs install, Prisma generation, formatting, typechecking, build, and tests                    |
+| Repository security | Secret scanning, push protection, protected main, SHA-pinned actions; Dependabot version updates are disabled |
 
 ## Required before production
 
