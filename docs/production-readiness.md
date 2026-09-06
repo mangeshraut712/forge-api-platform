@@ -16,7 +16,7 @@ ForgeAPI is a reference implementation, not a hosted production service. This pa
 | Input limits        | Zod schemas are strict and the API has a request body limit                                                       |
 | Health signals      | Liveness and PostgreSQL/Redis readiness endpoints are available                                                   |
 | Delivery checks     | GitHub Actions runs install, Prisma generation, formatting, typechecking, build, and tests                        |
-| Repository security | Secret scanning, push protection, Dependabot security updates, protected main, and SHA-pinned actions are enabled |
+| Repository security | Secret scanning, push protection, protected main, and SHA-pinned actions are enabled. Dependabot version and security updates are disabled; dependency bumps are applied manually |
 
 ## Required before production
 

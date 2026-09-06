@@ -27,6 +27,8 @@ pnpm build
 pnpm test
 ```
 
+Dependabot is not enabled. Propose dependency bumps in ordinary pull requests rather than relying on automated update PRs.
+
 For dependency changes, also run:
 
 ```bash
