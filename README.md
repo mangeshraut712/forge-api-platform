@@ -6,7 +6,17 @@ A self-hosted API-platform starter for teams that need secure API keys, scoped a
 
 ForgeAPI is built for platform engineers, backend developers, and small teams building internal, partner, multi-tenant, or AI/tool APIs. It is also a concrete reference project for understanding how these concerns fit together.
 
-> Current status: Early-stage reference implementation. The Todo API is the example resource; ForgeAPI is not a hosted SaaS product.
+> Current status (September 2026): Early-stage reference implementation. The Todo API is the example resource; ForgeAPI is not a hosted SaaS product.
+
+## Product
+
+Screenshots from a local September 2026 run of the control-plane dashboard against the Fastify Todo API (seeded demo project, live key, real request logs).
+
+![ForgeAPI usage dashboard showing quota, latency, and recent Todo API requests](docs/screenshots/usage.png)
+
+![ForgeAPI projects list with the seeded Demo Project](docs/screenshots/projects.png)
+
+![ForgeAPI API key management with live key, scopes, rotate, and revoke](docs/screenshots/api-keys.png)
 
 ## Why ForgeAPI
 
