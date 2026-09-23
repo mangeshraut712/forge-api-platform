@@ -212,7 +212,7 @@ async function demoQuotaExceeded() {
 async function main() {
   console.log("\n=== ForgeAPI Todo Demo ===\n");
   console.log(`Base URL: ${baseUrl}`);
-  console.log(`API Key:  ${apiKey.slice(0, 16)}...\n`);
+  console.log("API key: configured");
 
   await demoList();
   await demoCrud();

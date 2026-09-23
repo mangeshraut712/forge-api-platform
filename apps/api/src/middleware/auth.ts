@@ -4,6 +4,7 @@
  * Must run after the request-id plugin.
  */
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
+import rateLimit from "@fastify/rate-limit";
 import { verifyApiKey } from "../services/key-service.js";
 import { sendApiError, unauthorized, ApiError } from "../lib/errors.js";
 import { isPublicRoute } from "../lib/request-utils.js";
@@ -11,11 +12,17 @@ import { isPublicRoute } from "../lib/request-utils.js";
 function extractBearer(req: FastifyRequest): string | null {
   const auth = req.headers.authorization;
   if (!auth) return null;
-  const match = /^Bearer\s+(.+)$/i.exec(auth);
+  const match = /^Bearer ([^ \t]+)$/i.exec(auth);
   return match ? match[1]! : null;
 }
 
 export async function authPlugin(app: FastifyInstance): Promise<void> {
+  await app.register(rateLimit, {
+    global: true,
+    max: 100,
+    timeWindow: "1 minute",
+  });
+
   app.addHook("onRequest", async (req: FastifyRequest, reply: FastifyReply) => {
     // Skip auth for health checks
     if (isPublicRoute(req.url)) {
