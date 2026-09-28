@@ -8,15 +8,21 @@ ForgeAPI is built for platform engineers, backend developers, and small teams bu
 
 > Current status (September 2026): Early-stage reference implementation. The Todo API is the example resource; ForgeAPI is not a hosted SaaS product.
 
-## Product
+## Screenshots
 
-Screenshots from a local September 2026 run of the control-plane dashboard against the Fastify Todo API (seeded demo project, live key, real request logs).
+Framed captures of the live control-plane dashboard (current UI).
 
-![ForgeAPI usage dashboard showing quota, latency, and recent Todo API requests](docs/screenshots/usage.png)
+<div align="center">
 
-![ForgeAPI projects list with the seeded Demo Project](docs/screenshots/projects.png)
+<img src="docs/screenshots/01-usage.webp" alt="ForgeAPI usage dashboard with quota, latency, and recent Todo API requests" width="720" />
 
-![ForgeAPI API key management with live key, scopes, rotate, and revoke](docs/screenshots/api-keys.png)
+<img src="docs/screenshots/02-projects.webp" alt="ForgeAPI projects list with the seeded Demo Project" width="720" />
+
+<img src="docs/screenshots/03-api-keys.webp" alt="ForgeAPI API key management with live key, scopes, rotate, and revoke" width="720" />
+
+<img src="docs/screenshots/04-request-logs.webp" alt="ForgeAPI usage and API keys windows showing live request tracing" width="720" />
+
+</div>
 
 ## Why ForgeAPI
 
