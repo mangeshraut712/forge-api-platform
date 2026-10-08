@@ -27,8 +27,9 @@
   "pnpm": {
     "overrides": {
       "postcss": "8.5.26",
-      "sharp": "0.35.4",
-      "deepmerge-ts": ">=8.0.0"
+      "sharp": "0.35.5",
+      "deepmerge-ts": ">=8.0.0",
+      "source-map-js": "1.2.2"
     }
   },
   "devDependencies": {
