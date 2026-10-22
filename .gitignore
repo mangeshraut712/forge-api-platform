@@ -21,3 +21,6 @@ packages/db/prisma/*.db-journal
 
 #Ignore vscode AI rules
 .github/instructions/codacy.instructions.md
+# Local agent tooling
+.agents/
+skills-lock.json
