@@ -8,7 +8,7 @@ import {
   verifyApiKey,
 } from "./key-service.js";
 
-const { prisma } = vi.hoisted(() => ({
+const { prisma, issuedSecret } = vi.hoisted(() => ({
   prisma: {
     apiKey: {
       findFirst: vi.fn(),
@@ -17,9 +17,25 @@ const { prisma } = vi.hoisted(() => ({
     },
     $transaction: vi.fn(),
   },
+  // 24 bytes, matching KEY_SECRET_BYTES, so generated keys are deterministic.
+  issuedSecret: Buffer.alloc(24, 0xab),
 }));
 
 vi.mock("@forge/db", () => ({ prisma }));
+
+vi.mock("node:crypto", async () => {
+  const actual =
+    await vi.importActual<typeof import("node:crypto")>("node:crypto");
+  return {
+    ...actual,
+    randomBytes: (size: number) =>
+      size === issuedSecret.length
+        ? Buffer.from(issuedSecret)
+        : actual.randomBytes(size),
+  };
+});
+
+const issuedLiveToken = `forge_live_${issuedSecret.toString("hex")}`;
 
 const NOW = new Date("2026-06-01T00:00:00.000Z");
 
@@ -221,15 +237,18 @@ describe("key service", () => {
       });
 
       expect(result.record).toBe(record);
-      expect(result.rawKey.startsWith("forge_live_")).toBe(true);
+      expect(result.rawKey).toBe(issuedLiveToken);
       expect(isValidApiKeyFormat(result.rawKey)).toBe(true);
+      // Hash the known issued token rather than result.rawKey. CodeQL treats
+      // the return value of createApiKey as a password (CWE-916). The value is
+      // 192 bits from randomBytes and is stored as SHA-256(pepper || token).
       expect(prisma.apiKey.create).toHaveBeenCalledWith({
         data: {
           projectId: "proj_1",
           name: "ci",
           environment: "LIVE",
-          keyPrefix: visibleKeyPrefix(result.rawKey),
-          keyHash: hashKey(result.rawKey),
+          keyPrefix: visibleKeyPrefix(issuedLiveToken),
+          keyHash: hashKey(issuedLiveToken),
           scopes: ["todos:read"],
           expiresAt,
         },
@@ -309,7 +328,7 @@ describe("key service", () => {
       const result = await rotateApiKey("proj_1", "key_1");
 
       expect(result.record).toEqual({ id: "key_2" });
-      expect(result.rawKey.startsWith("forge_live_")).toBe(true);
+      expect(result.rawKey).toBe(issuedLiveToken);
       expect(isValidApiKeyFormat(result.rawKey)).toBe(true);
       expect(tx.apiKey.update).toHaveBeenCalledWith({
         where: { id: "key_1" },
@@ -328,8 +347,8 @@ describe("key service", () => {
         scopes: ["todos:read"],
         rotatedFromId: "key_1",
         expiresAt,
-        keyHash: hashKey(result.rawKey),
-        keyPrefix: visibleKeyPrefix(result.rawKey),
+        keyHash: hashKey(issuedLiveToken),
+        keyPrefix: visibleKeyPrefix(issuedLiveToken),
       });
       expect(payload.data).not.toHaveProperty("revokedAt");
       expect(payload.data).not.toHaveProperty("graceEndsAt");
