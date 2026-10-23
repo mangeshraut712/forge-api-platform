@@ -16,5 +16,13 @@ describe("request utilities", () => {
   it("replaces unsafe or oversized request ids", () => {
     expect(resolveRequestId("bad id")).not.toBe("bad id");
     expect(resolveRequestId("x".repeat(129))).not.toBe("x".repeat(129));
+    expect(resolveRequestId("")).not.toBe("");
+    expect(resolveRequestId("a/b")).not.toBe("a/b");
+  });
+
+  it("generates an id when none is provided", () => {
+    expect(resolveRequestId()).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+    );
   });
 });
