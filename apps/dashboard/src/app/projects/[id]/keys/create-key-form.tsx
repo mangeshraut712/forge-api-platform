@@ -80,18 +80,15 @@ export default function CreateKeyForm({ projectId }: { projectId: string }) {
       )}
 
       {error && (
-        <div
-          style={{
-            color: "#f87171",
-            marginBottom: "0.75rem",
-            fontSize: "0.85rem",
-          }}
-        >
+        <div id="create-key-error" role="alert" className="form-error">
           {error}
         </div>
       )}
 
-      <form onSubmit={handleSubmit}>
+      <form
+        onSubmit={handleSubmit}
+        aria-describedby={error ? "create-key-error" : undefined}
+      >
         <label htmlFor="key-name">Key name</label>
         <input
           id="key-name"
@@ -99,6 +96,8 @@ export default function CreateKeyForm({ projectId }: { projectId: string }) {
           onChange={(e) => setName(e.target.value)}
           placeholder="Production key"
           required
+          maxLength={100}
+          aria-invalid={error ? true : undefined}
         />
 
         <label htmlFor="env">Environment</label>
@@ -119,34 +118,37 @@ export default function CreateKeyForm({ projectId }: { projectId: string }) {
           onChange={(e) => setExpiresAt(e.target.value)}
         />
 
-        <label>Scopes</label>
-        <div style={{ marginBottom: "0.75rem" }}>
-          {ALL_SCOPES.map((scope) => (
-            <label
-              key={scope}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "0.5rem",
-                marginBottom: "0.25rem",
-                cursor: "pointer",
-              }}
-            >
-              <input
-                type="checkbox"
-                checked={scopes.includes(scope)}
-                onChange={() => toggleScope(scope)}
-                style={{ width: "auto", marginBottom: 0 }}
-              />
-              <span style={{ fontSize: "0.9rem" }}>{scope}</span>
-            </label>
-          ))}
-        </div>
+        <fieldset>
+          <legend>Scopes</legend>
+          <div>
+            {ALL_SCOPES.map((scope) => (
+              <label
+                key={scope}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.5rem",
+                  marginBottom: "0.25rem",
+                  cursor: "pointer",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={scopes.includes(scope)}
+                  onChange={() => toggleScope(scope)}
+                  style={{ width: "auto", marginBottom: 0 }}
+                />
+                <span style={{ fontSize: "0.9rem" }}>{scope}</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
 
         <button
           type="submit"
           className="btn"
           disabled={loading || scopes.length === 0}
+          aria-busy={loading}
         >
           {loading ? "Creating..." : "Create key"}
         </button>

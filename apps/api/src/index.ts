@@ -25,7 +25,9 @@ async function buildServer() {
         ? undefined
         : { target: "pino-pretty", options: { colorize: true } },
     },
-    trustProxy: true,
+    // Numeric hop counts are accepted by proxy-addr at runtime. Fastify's
+    // published option type only lists boolean and address strings.
+    trustProxy: env.trustProxy as boolean | string,
   });
 
   // Plugins (order matters)

@@ -16,30 +16,21 @@ Custom plans resolve as follows:
 
 ## Implementation
 
-Quota enforcement uses **Redis atomic INCR + EXPIRE**:
+Quota enforcement increments the counter and sets its TTL in one Redis script:
 
-```typescript
-async function checkQuota(projectId: string, project: Project) {
-  const quota = resolvePlanQuota(project);
-  const windowId = quotaWindowId(quota.window); // "2026-03-24" or "2026-03"
-  const ttl = quotaWindowTtlSeconds(quota.window); // seconds until window end
-  const key = `quota:${projectId}:${quota.window}:${windowId}`;
-
-  const count = await redis.incr(key); // atomic
-  if (count === 1) await redis.expire(key, ttl); // set TTL on first request
-  return {
-    allowed: count <= quota.limit,
-    remaining: Math.max(0, quota.limit - count),
-    limit: quota.limit,
-    window: quota.window,
-    resetUnix: quotaWindowResetUnix(quota.window),
-  };
-}
+```lua
+local count = redis.call('INCR', KEYS[1])
+if redis.call('TTL', KEYS[1]) < 0 then
+  redis.call('EXPIRE', KEYS[1], tonumber(ARGV[1]))
+end
+return count
 ```
+
+The key is `quota:{projectId}:{window}:{windowId}` (for example `quota:proj_1:day:2026-03-24`). A separate `INCR` followed by `EXPIRE` can leave a counter with no TTL if the process stops between the two commands. The script also repairs a key whose TTL was lost.
 
 This approach is:
 
-- **Atomic** — Redis `INCR` is a single operation, no race conditions on concurrent requests.
+- **Atomic** — the increment and expiry happen in one script, so concurrent requests cannot race the TTL.
 - **Self-cleaning** — TTL expires the counter at the end of the UTC window.
 - **Efficient** — O(1) per request, no database writes for quota.
 
@@ -73,16 +64,16 @@ HTTP Status: `429 Too Many Requests`
 
 When Redis is unavailable, the behavior is controlled by `QUOTA_FAIL_MODE`:
 
-| Mode             | Behavior                                                           |
-| ---------------- | ------------------------------------------------------------------ |
-| `open` (default) | Allow requests through (availability over strictness)              |
-| `closed`         | Reject with 429 `quota_unavailable` (strictness over availability) |
+| Mode             | Behavior                                                                |
+| ---------------- | ----------------------------------------------------------------------- |
+| `open` (default) | Allow requests through (availability over strictness)                   |
+| `closed`         | Reject with HTTP 503 `quota_unavailable` (strictness over availability) |
 
 **Design decision**: We default to fail-open because the platform's primary value is API availability. A brief quota-check outage shouldn't take down all consumer apps. In strictly-billed scenarios (e.g., paid plans), set `QUOTA_FAIL_MODE=closed`.
 
 ## Concurrent Quota Updates
 
-Redis `INCR` guarantees exactly-once incrementation even under high concurrency. The TTL is only set when the counter transitions from 0 to 1, avoiding redundant `EXPIRE` calls.
+Redis `INCR` guarantees exactly-once incrementation even under high concurrency. The script sets a TTL whenever the key has none, including the first request in the window.
 
 ## Monitoring
 
@@ -90,7 +81,7 @@ Quota usage is visible in the dashboard's Usage page:
 
 - Total requests
 - Success rate
-- 429 responses
+- 429 responses (HTTP status 429, including quota denials)
 - p50/p95 latency
 - Active API keys
 - Recent request log (method, path, status, latency)

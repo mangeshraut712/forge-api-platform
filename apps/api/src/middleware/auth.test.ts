@@ -182,23 +182,35 @@ describe("auth middleware", () => {
     expect(verifyApiKey).not.toHaveBeenCalled();
   });
 
-  it("applies the global limiter to public routes", async () => {
+  it("does not rate limit health probes", async () => {
+    const created = await createApp();
+    app = created.app;
+
+    for (let attempt = 0; attempt < 101; attempt += 1) {
+      const response = await app.inject({ method: "GET", url: "/health" });
+      expect(response.statusCode).toBe(200);
+    }
+    expect(verifyApiKey).not.toHaveBeenCalled();
+  });
+
+  it("rate limits protected routes with a stable error code", async () => {
     const created = await createApp();
     app = created.app;
 
     for (let attempt = 0; attempt < 100; attempt += 1) {
-      const response = await app.inject({ method: "GET", url: "/health" });
-      expect(response.statusCode).toBe(200);
+      const response = await app.inject({ method: "GET", url: "/v1/todos" });
+      expect(response.statusCode).toBe(401);
     }
 
-    const limited = await app.inject({ method: "GET", url: "/health" });
+    const limited = await app.inject({ method: "GET", url: "/v1/todos" });
 
     expect(limited.statusCode).toBe(429);
-    expect(limited.json().error).toMatchObject({
-      code: "validation_error",
+    expect(limited.json().error).toEqual({
+      code: "rate_limited",
+      message: "Too many requests",
       request_id: "req_auth",
     });
-    expect(limited.json().error.message).toContain("Rate limit exceeded");
+    expect(limited.headers["retry-after"]).toBeTruthy();
     expect(verifyApiKey).not.toHaveBeenCalled();
   });
 });

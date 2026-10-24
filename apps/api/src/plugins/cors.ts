@@ -21,6 +21,7 @@ export async function corsPlugin(app: FastifyInstance): Promise<void> {
       "X-RateLimit-Remaining",
       "X-RateLimit-Reset",
     ],
-    credentials: true,
+    // The API authenticates with Authorization headers, not cookies.
+    credentials: false,
   });
 }

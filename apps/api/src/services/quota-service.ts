@@ -11,7 +11,15 @@ import {
   resolvePlanQuota,
   type PlanQuota,
 } from "@forge/shared";
-import { ApiError, quotaExceeded } from "../lib/errors.js";
+import { ApiError } from "../lib/errors.js";
+
+const QUOTA_INCREMENT_SCRIPT = `
+local count = redis.call('INCR', KEYS[1])
+if redis.call('TTL', KEYS[1]) < 0 then
+  redis.call('EXPIRE', KEYS[1], tonumber(ARGV[1]))
+end
+return count
+`;
 
 export type QuotaCheckResult = {
   allowed: boolean;
@@ -49,10 +57,15 @@ export async function checkQuota(
 
   try {
     const redis = getRedis();
-    const count = await redis.incr(key);
-    if (count === 1) {
-      // First request in window — set expiry
-      await redis.expire(key, ttl);
+    const incremented = await redis.eval(
+      QUOTA_INCREMENT_SCRIPT,
+      1,
+      key,
+      String(ttl),
+    );
+    const count = Number(incremented);
+    if (!Number.isSafeInteger(count) || count < 1) {
+      throw new Error("invalid quota counter");
     }
     const remaining = Math.max(0, quota.limit - count);
     const allowed = count <= quota.limit;
@@ -74,7 +87,7 @@ export async function checkQuota(
         resetUnix,
       };
     }
-    throw quotaExceeded("Quota service unavailable");
+    throw new ApiError(503, "quota_unavailable", "Quota service unavailable");
   }
 }
 
@@ -94,7 +107,11 @@ export async function getQuotaUsage(
 
   try {
     const redis = getRedis();
-    const count = parseInt((await redis.get(key)) ?? "0", 10);
+    const raw = await redis.get(key);
+    const count = raw == null ? 0 : Number(raw);
+    if (!Number.isSafeInteger(count) || count < 0) {
+      throw new Error("invalid quota counter");
+    }
     const remaining = Math.max(0, quota.limit - count);
     return {
       allowed: remaining > 0,

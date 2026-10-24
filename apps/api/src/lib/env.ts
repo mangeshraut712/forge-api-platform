@@ -37,6 +37,26 @@ if (nodeEnv === "production" && apiKeyHashPepper.length < 32) {
   );
 }
 
+/**
+ * Fastify's trustProxy flag. Default is false so a client cannot spoof
+ * X-Forwarded-For and bypass the IP rate limit. Set a hop count when the
+ * process sits behind a known proxy.
+ */
+function trustProxySetting(): boolean | number {
+  const raw = (process.env.TRUST_PROXY ?? "false").trim().toLowerCase();
+  if (raw === "true") return true;
+  if (raw === "false" || raw === "") return false;
+  if (/^\d+$/.test(raw)) {
+    const hops = Number(raw);
+    if (hops >= 0 && hops <= 10) return hops;
+  }
+  throw new Error(
+    'TRUST_PROXY must be "true", "false", or a hop count from 0 to 10',
+  );
+}
+
+const trustProxy = trustProxySetting();
+
 export const env = {
   nodeEnv,
   isProd: nodeEnv === "production",
@@ -53,6 +73,7 @@ export const env = {
   ]),
   apiKeyHashPepper,
   quotaFailMode,
+  trustProxy,
 };
 
 export type Env = typeof env;

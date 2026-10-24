@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { logRequest } from "./log-service.js";
+import { logRequest, sanitizeLogPath } from "./log-service.js";
 
 const { create } = vi.hoisted(() => ({
   create: vi.fn(),
@@ -20,6 +20,18 @@ const entry = {
   requestId: "req_1",
 };
 
+describe("sanitizeLogPath", () => {
+  it("drops query strings, fragments, and control characters", () => {
+    expect(sanitizeLogPath("/v1/todos?cursor=secret")).toBe("/v1/todos");
+    expect(sanitizeLogPath("/v1/todos#frag")).toBe("/v1/todos");
+    expect(sanitizeLogPath("/v1/todos\r\nSet-Cookie: evil")).toBe(
+      "/v1/todosSet-Cookie: evil",
+    );
+    expect(sanitizeLogPath("v1/todos")).toBe("/v1/todos");
+    expect(sanitizeLogPath(`/v1/${"a".repeat(3000)}`)).toHaveLength(2048);
+  });
+});
+
 describe("logRequest", () => {
   beforeEach(() => {
     create.mockReset();
@@ -36,6 +48,20 @@ describe("logRequest", () => {
         apiKeyId: null,
         errorCode: null,
       },
+    });
+  });
+
+  it("stores a sanitized path", async () => {
+    logRequest({
+      ...entry,
+      path: "/v1/todos?limit=20\ninjected",
+    });
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        path: "/v1/todos",
+      }),
     });
   });
 

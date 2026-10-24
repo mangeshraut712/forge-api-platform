@@ -25,4 +25,17 @@ describe("todo request schemas", () => {
   it("applies the default page size", () => {
     expect(listTodosQuerySchema.parse({})).toEqual({ limit: 20 });
   });
+
+  it("rejects null bytes in titles and unsafe cursors", () => {
+    expect(() => createTodoSchema.parse({ title: "bad\u0000title" })).toThrow();
+    expect(() => updateTodoSchema.parse({ title: "bad\u0000title" })).toThrow();
+    expect(() => listTodosQuerySchema.parse({ cursor: "../secret" })).toThrow();
+    expect(() =>
+      listTodosQuerySchema.parse({ cursor: "x".repeat(65) }),
+    ).toThrow();
+    expect(listTodosQuerySchema.parse({ cursor: "todo_1" })).toMatchObject({
+      cursor: "todo_1",
+      limit: 20,
+    });
+  });
 });

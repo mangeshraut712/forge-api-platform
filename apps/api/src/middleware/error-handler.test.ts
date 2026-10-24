@@ -25,6 +25,15 @@ async function createApp(options?: { requestId?: boolean }): Promise<{
   app.get("/revoked", async () => {
     throw new ApiError(403, "key_revoked", "API key has been revoked");
   });
+  app.get("/limited", async () => {
+    const error = new Error(
+      "Rate limit exceeded, retry in 1000 ms",
+    ) as Error & {
+      statusCode: number;
+    };
+    error.statusCode = 429;
+    throw error;
+  });
   app.get("/client-error", async () => {
     const error = new Error("Request is invalid") as Error & {
       statusCode: number;
@@ -92,6 +101,28 @@ describe("error handler", () => {
       message: "API key has been revoked",
     });
     expect(created.errorCode()).toBe("key_revoked");
+  });
+
+  it("maps rate limits onto rate_limited without the library message", async () => {
+    const created = await createApp();
+    app = created.app;
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/limited",
+      headers: { "x-request-id": "trace_429" },
+    });
+
+    expect(response.statusCode).toBe(429);
+    expect(response.json()).toEqual({
+      error: {
+        code: "rate_limited",
+        message: "Too many requests",
+        request_id: "trace_429",
+      },
+    });
+    expect(JSON.stringify(response.json())).not.toContain("1000");
+    expect(created.errorCode()).toBe("rate_limited");
   });
 
   it("maps other client errors onto validation_error", async () => {

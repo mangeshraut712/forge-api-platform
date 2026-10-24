@@ -230,6 +230,36 @@ describe("ForgeClient", () => {
     expect(opts.headers).not.toHaveProperty("Content-Type");
   });
 
+  it("rejects invalid retry and timeout options", () => {
+    const apiKey = "forge_test_" + "a".repeat(48);
+    expect(() => createForgeClient({ apiKey, timeoutMs: 0 })).toThrow(
+      "timeoutMs must be a positive number",
+    );
+    expect(() => createForgeClient({ apiKey, timeoutMs: -1 })).toThrow(
+      "timeoutMs must be a positive number",
+    );
+    expect(() => createForgeClient({ apiKey, maxRetries: 1.5 })).toThrow(
+      "maxRetries must be an integer from 0 to 5",
+    );
+    expect(() => createForgeClient({ apiKey, maxRetries: 6 })).toThrow(
+      "maxRetries must be an integer from 0 to 5",
+    );
+  });
+
+  it("does not follow redirects with the bearer token", async () => {
+    const fetchFn = mockFetch(jsonResponse({ data: [], nextCursor: null }));
+    const client = createForgeClient({
+      apiKey: "forge_test_" + "a".repeat(48),
+      fetchImpl: fetchFn,
+    });
+
+    await client.listTodos();
+
+    const opts = (fetchFn as unknown as ReturnType<typeof vi.fn>).mock
+      .calls[0]?.[1] as RequestInit;
+    expect(opts.redirect).toBe("error");
+  });
+
   it("uses custom base URL", async () => {
     const fetchFn = mockFetch(jsonResponse({ data: [], nextCursor: null }));
 

@@ -38,7 +38,8 @@ This document describes the security threats considered in ForgeAPI's design, th
 
 - `verifyApiKey` checks `revokedAt` on every request.
 - Rotated keys get a **grace period** (`graceEndsAt`) — after it expires, the key is effectively revoked.
-- `softDeleteUser` revokes all active keys of a user's projects in a transaction.
+- `softDeleteUser` revokes every key on a user's projects, clears rotation grace, and deletes sessions in one transaction.
+- `verifyApiKey` also rejects a key when the project owner is already deleted.
 
 ### 3. Quota Bypass / Abuse
 
@@ -46,7 +47,7 @@ This document describes the security threats considered in ForgeAPI's design, th
 
 **Mitigations**:
 
-- Quota enforced via Redis `INCR` (atomic, no race conditions).
+- Quota enforced via a Redis script that increments and sets the TTL together (atomic, no race conditions).
 - Per-project, per-window counters with TTL.
 - `X-RateLimit-*` headers expose remaining quota to clients.
 - 429 responses with `quota_exceeded` code.
@@ -92,7 +93,7 @@ This document describes the security threats considered in ForgeAPI's design, th
 **Mitigations**:
 
 - `QUOTA_FAIL_MODE=open` (default) — allow requests through (availability).
-- `QUOTA_FAIL_MODE=closed` — reject with 429 `quota_unavailable`.
+- `QUOTA_FAIL_MODE=closed` — reject with HTTP 503 `quota_unavailable`.
 - Redis client has `maxRetriesPerRequest: 2` and error logging.
 
 ### 8. Database Transaction Failures
@@ -120,8 +121,8 @@ This document describes the security threats considered in ForgeAPI's design, th
 
 **Mitigations**:
 
-- `softDeleteUser` revokes all active keys of the user's projects in a transaction.
-- Keys are checked for `revokedAt` on every request.
+- `softDeleteUser` revokes all of the user's project keys, including keys still in a grace window, and clears `graceEndsAt`.
+- `verifyApiKey` rejects keys whose owner is deleted, even if a key row was left active.
 
 ### 11. CORS Abuse
 
@@ -130,8 +131,11 @@ This document describes the security threats considered in ForgeAPI's design, th
 **Mitigations**:
 
 - CORS restricted to `CORS_ORIGINS` env var (defaults to localhost:3000/3001).
+- Credentialed CORS is disabled. Callers send `Authorization`; cookies are not an API credential.
 - Only `Authorization`, `Content-Type`, `Idempotency-Key`, `X-Request-Id` headers allowed.
 - `X-RateLimit-*` headers exposed for client-side quota display.
+- `TRUST_PROXY` defaults to false so a client cannot spoof `X-Forwarded-For` and evade the per-IP limiter. Set a hop count only when a trusted proxy is in front of the process.
+- The IP limiter runs before authentication, so invalid credentials still consume the budget. `/health` and `/ready` are excluded.
 
 ### 12. SDK Version Compatibility
 
@@ -145,10 +149,10 @@ This document describes the security threats considered in ForgeAPI's design, th
 
 ## Residual Risks & Future Work
 
-| Risk                     | Description                                     | Mitigation                                      |
-| ------------------------ | ----------------------------------------------- | ----------------------------------------------- |
-| Brute-force key guessing | 48 hex chars = 192 bits of entropy — infeasible | None needed                                     |
-| Rate limiting per IP     | Currently only per-project quota, not per-IP    | Add IP-based rate limiting                      |
-| Audit logging            | Request logs exist but no admin audit trail     | Add admin audit log                             |
-| Key expiry enforcement   | Expired keys return 403 but no auto-cleanup     | Add scheduled job to purge expired keys         |
-| SDK retry on 429         | SDK retries GET on 429 but not POST             | Document idempotency-key usage for POST retries |
+| Risk                     | Description                                                                                      | Mitigation                                                       |
+| ------------------------ | ------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------- |
+| Brute-force key guessing | 48 hex chars = 192 bits of entropy — infeasible                                                  | None needed                                                      |
+| Rate limiting per IP     | In-memory limiter, 100 requests/minute, not shared across processes. Health checks are excluded. | Move the limiter to Redis when running more than one API process |
+| Audit logging            | Request logs exist but no admin audit trail                                                      | Add admin audit log                                              |
+| Key expiry enforcement   | Expired keys return 403 but no auto-cleanup                                                      | Add scheduled job to purge expired keys                          |
+| SDK retry on 429         | SDK retries GET on 429 but not POST                                                              | Document idempotency-key usage for POST retries                  |

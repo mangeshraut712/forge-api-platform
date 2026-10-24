@@ -34,8 +34,8 @@ export async function softDeleteUser(db: PrismaClient, userId: string) {
     const projectIds = projects.map((p) => p.id);
     if (projectIds.length > 0) {
       await tx.apiKey.updateMany({
-        where: { projectId: { in: projectIds }, revokedAt: null },
-        data: { revokedAt: now },
+        where: { projectId: { in: projectIds } },
+        data: { revokedAt: now, graceEndsAt: null },
       });
     }
     await tx.session.deleteMany({ where: { userId } });

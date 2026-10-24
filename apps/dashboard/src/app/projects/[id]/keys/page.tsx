@@ -1,8 +1,7 @@
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@forge/db";
 import { redirect } from "next/navigation";
 import { assertProjectOwner } from "@forge/auth";
+import { getSessionUser } from "@/lib/session";
 import CreateKeyForm from "./create-key-form";
 import KeyList from "./key-list";
 
@@ -12,12 +11,12 @@ export default async function KeysPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const session = await getServerSession(authOptions);
-  if (!session?.user) {
+  const user = await getSessionUser();
+  if (!user) {
     redirect("/login");
   }
 
-  const userId = (session.user as { id?: string }).id!;
+  const userId = user.id;
 
   // Verify ownership
   try {

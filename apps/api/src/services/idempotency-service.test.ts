@@ -1,12 +1,9 @@
-import { createHash } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "@forge/db";
-import { runIdempotent } from "./idempotency-service.js";
+import { hashIdempotencyBody, runIdempotent } from "./idempotency-service.js";
 
 function hashBody(body: unknown): string {
-  return createHash("sha256")
-    .update(JSON.stringify(body ?? null))
-    .digest("hex");
+  return hashIdempotencyBody(body);
 }
 
 type Tx = {
@@ -81,6 +78,25 @@ describe("runIdempotent", () => {
     });
     expect(operation).not.toHaveBeenCalled();
     expect(tx.idempotencyRecord.create).not.toHaveBeenCalled();
+  });
+
+  it("treats different object key order as the same body", async () => {
+    const { db, tx } = createDb();
+    tx.idempotencyRecord.findUnique.mockResolvedValue({
+      requestHash: hashBody({ title: "Create once", completed: false }),
+      responseCode: 201,
+      responseBody: { id: "todo_1" },
+    });
+
+    await expect(
+      runIdempotent(
+        "proj_1",
+        "key_1",
+        { completed: false, title: "Create once" },
+        vi.fn(),
+        db,
+      ),
+    ).resolves.toMatchObject({ conflict: false, replay: true });
   });
 
   it("reports a conflict when the stored hash differs", async () => {

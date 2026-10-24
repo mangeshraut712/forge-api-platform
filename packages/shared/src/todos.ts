@@ -1,15 +1,24 @@
 import { z } from "zod";
 
+const todoTitle = z
+  .string()
+  .trim()
+  .min(1)
+  .max(500)
+  .refine((value) => !value.includes("\u0000"), {
+    message: "Title cannot contain null characters",
+  });
+
 export const createTodoSchema = z
   .object({
-    title: z.string().trim().min(1).max(500),
+    title: todoTitle,
     completed: z.boolean().optional().default(false),
   })
   .strict();
 
 export const updateTodoSchema = z
   .object({
-    title: z.string().trim().min(1).max(500).optional(),
+    title: todoTitle.optional(),
     completed: z.boolean().optional(),
   })
   .strict()
@@ -20,7 +29,10 @@ export const updateTodoSchema = z
 export const listTodosQuerySchema = z
   .object({
     limit: z.coerce.number().int().min(1).max(100).default(20),
-    cursor: z.string().optional(),
+    cursor: z
+      .string()
+      .regex(/^[A-Za-z0-9_-]{1,64}$/, "Invalid pagination cursor")
+      .optional(),
   })
   .strict();
 

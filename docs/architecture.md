@@ -57,7 +57,7 @@ forge-api-platform/
 ## Key Design Decisions
 
 - **API keys are never stored raw** — only a SHA-256 hash with a pepper. The visible prefix (first 16 chars) is stored for lookup/display.
-- **Quota is enforced in Redis** using `INCR` + `EXPIRE` per UTC window. This is atomic and avoids race conditions.
+- **Quota is enforced in Redis** using one script that increments the counter and sets its TTL per UTC window.
 - **Fail-open vs fail-closed** — when Redis is unavailable, `QUOTA_FAIL_MODE=open` allows requests through (availability over strictness), while `closed` rejects them.
 - **Idempotency** — POST/PUT/PATCH accept an `Idempotency-Key` header. The side effect and response record commit in one transaction, so concurrent first requests cannot create duplicate todos. A different body with the same key returns 409.
 - **Key rotation** — rotating a key creates a new key and gives the old one a 7-day grace period so active clients aren't broken.

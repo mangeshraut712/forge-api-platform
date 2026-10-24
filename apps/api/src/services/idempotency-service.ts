@@ -7,9 +7,28 @@ import { createHash } from "node:crypto";
 import { prisma } from "@forge/db";
 import type { Prisma, PrismaClient } from "@forge/db";
 
-function requestHash(body: unknown): string {
+/**
+ * Stable JSON so object key order does not change the idempotency hash.
+ * JSON numbers, strings, booleans, null, arrays, and plain objects are supported.
+ */
+export function canonicalJson(value: unknown): string {
+  if (value === undefined || value === null) return "null";
+  if (typeof value !== "object") {
+    return JSON.stringify(value) ?? "null";
+  }
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => canonicalJson(item)).join(",")}]`;
+  }
+  const record = value as Record<string, unknown>;
+  const keys = Object.keys(record).sort();
+  return `{${keys
+    .map((key) => `${JSON.stringify(key)}:${canonicalJson(record[key])}`)
+    .join(",")}}`;
+}
+
+export function hashIdempotencyBody(body: unknown): string {
   return createHash("sha256")
-    .update(JSON.stringify(body ?? null))
+    .update(canonicalJson(body ?? null))
     .digest("hex");
 }
 
@@ -31,7 +50,7 @@ export async function runIdempotent<T>(
   ) => Promise<{ responseCode: number; responseBody: T }>,
   db: PrismaClient = prisma,
 ): Promise<IdempotencyResult<T>> {
-  const hash = requestHash(body);
+  const hash = hashIdempotencyBody(body);
 
   try {
     return await db.$transaction(async (tx) => {

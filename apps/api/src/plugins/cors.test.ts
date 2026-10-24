@@ -24,7 +24,9 @@ describe("CORS plugin", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.headers["access-control-allow-origin"]).toBe(origin);
-    expect(response.headers["access-control-allow-credentials"]).toBe("true");
+    expect(response.headers["access-control-allow-credentials"]).not.toBe(
+      "true",
+    );
     expect(String(response.headers["access-control-expose-headers"])).toContain(
       "X-RateLimit-Remaining",
     );
