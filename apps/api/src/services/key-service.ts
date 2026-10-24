@@ -4,7 +4,11 @@
  */
 import { prisma } from "@forge/db";
 import { hashKey, generateKey } from "../lib/key-crypto.js";
-import { isValidApiKeyFormat, visibleKeyPrefix } from "@forge/shared";
+import {
+  envFromApiKey,
+  isValidApiKeyFormat,
+  visibleKeyPrefix,
+} from "@forge/shared";
 import { ApiError, unauthorized, forbidden } from "../lib/errors.js";
 import type { AuthContext } from "../lib/types.js";
 
@@ -20,7 +24,7 @@ export async function verifyApiKey(rawKey: string): Promise<VerifiedKey> {
   }
 
   const keyHash = hashKey(rawKey);
-  const apiKey = await prisma.apiKey.findFirst({
+  const apiKey = await prisma.apiKey.findUnique({
     where: { keyHash },
     include: {
       project: {
@@ -31,6 +35,7 @@ export async function verifyApiKey(rawKey: string): Promise<VerifiedKey> {
           plan: true,
           customDailyLimit: true,
           customMonthlyLimit: true,
+          owner: { select: { deletedAt: true } },
         },
       },
     },
@@ -38,6 +43,15 @@ export async function verifyApiKey(rawKey: string): Promise<VerifiedKey> {
 
   if (!apiKey) {
     throw unauthorized("Unknown API key");
+  }
+
+  const keyEnv = envFromApiKey(rawKey);
+  if (!keyEnv || apiKey.environment !== keyEnv) {
+    throw unauthorized("Invalid API key");
+  }
+
+  if (apiKey.project.owner.deletedAt) {
+    throw new ApiError(403, "key_revoked", "API key has been revoked");
   }
 
   if (apiKey.revokedAt) {
@@ -61,8 +75,10 @@ export async function verifyApiKey(rawKey: string): Promise<VerifiedKey> {
     })
     .catch(() => {});
 
+  const { owner: _owner, ...project } = apiKey.project;
+
   return {
-    project: apiKey.project,
+    project,
     apiKey: {
       id: apiKey.id,
       name: apiKey.name,
@@ -132,6 +148,9 @@ export async function rotateApiKey(
   });
   if (!existing) {
     throw new ApiError(404, "not_found", "API key not found");
+  }
+  if (existing.expiresAt && existing.expiresAt.getTime() <= Date.now()) {
+    throw new ApiError(409, "conflict", "Cannot rotate an expired key");
   }
   // Fully revoked (past grace) cannot be rotated
   if (

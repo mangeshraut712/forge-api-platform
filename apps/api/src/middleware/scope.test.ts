@@ -35,10 +35,10 @@ describe("requireScope", () => {
 
     const response = await app.inject({ method: "GET", url: "/v1/todos" });
 
-    expect(response.statusCode).toBe(403);
+    expect(response.statusCode).toBe(401);
     expect(response.json()).toEqual({
       error: {
-        code: "forbidden",
+        code: "unauthorized",
         message: "No auth context",
         request_id: "req_scope",
       },
@@ -57,7 +57,7 @@ describe("requireScope", () => {
 
     expect(response.statusCode).toBe(403);
     expect(response.json().error).toEqual({
-      code: "forbidden",
+      code: "insufficient_scope",
       message: "Missing required scope(s): todos:write",
       request_id: "req_scope",
     });

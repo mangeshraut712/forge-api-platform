@@ -4,6 +4,18 @@
  */
 import { prisma } from "@forge/db";
 
+const MAX_LOG_PATH_LENGTH = 2048;
+
+/** Drop query strings and control characters before a path is stored. */
+export function sanitizeLogPath(path: string): string {
+  const withoutQuery = path.split("?")[0] ?? "";
+  const withoutHash = withoutQuery.split("#")[0] ?? "";
+  const cleaned = withoutHash.replace(/[\u0000-\u001f\u007f]/g, "");
+  const sliced = cleaned.slice(0, MAX_LOG_PATH_LENGTH);
+  if (sliced.startsWith("/")) return sliced;
+  return `/${sliced}`.slice(0, MAX_LOG_PATH_LENGTH);
+}
+
 export type RequestLogInput = {
   projectId: string;
   apiKeyId?: string | null;
@@ -22,7 +34,7 @@ export function logRequest(input: RequestLogInput): void {
         projectId: input.projectId,
         apiKeyId: input.apiKeyId ?? null,
         method: input.method,
-        path: input.path,
+        path: sanitizeLogPath(input.path),
         statusCode: input.statusCode,
         latencyMs: input.latencyMs,
         requestId: input.requestId,

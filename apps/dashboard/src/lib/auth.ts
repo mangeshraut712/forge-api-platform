@@ -6,12 +6,20 @@ import type { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
 import { prisma } from "@forge/db";
+import {
+  authSecretProblem,
+  hasGoogleAuth,
+  isDevLoginEnabled,
+  isVerifiedGoogleProfile,
+} from "./auth-policy";
 
-const isDev = process.env.NODE_ENV !== "production";
-const enableDevLogin = process.env.AUTH_DEV_LOGIN === "true";
-const hasGoogleCreds = Boolean(
-  process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET,
-);
+const secretProblem = authSecretProblem();
+if (secretProblem) {
+  throw new Error(secretProblem);
+}
+
+const enableDevLogin = isDevLoginEnabled();
+const hasGoogleCreds = hasGoogleAuth();
 
 export const authOptions: NextAuthOptions = {
   session: { strategy: "jwt" },
@@ -25,7 +33,7 @@ export const authOptions: NextAuthOptions = {
           }),
         ]
       : []),
-    ...(isDev && enableDevLogin
+    ...(enableDevLogin
       ? [
           CredentialsProvider({
             name: "Dev Login",
@@ -61,10 +69,12 @@ export const authOptions: NextAuthOptions = {
       : []),
   ],
   callbacks: {
-    async signIn({ user, account }) {
+    async signIn({ user, account, profile }) {
       // Google OAuth: ensure a Prisma user exists and is linked by googleSub.
       // Without an adapter, NextAuth's user.id is the Google sub — not our cuid.
-      if (account?.provider === "google" && user.email) {
+      // Unverified Google emails are rejected so they cannot take over a user.
+      if (account?.provider === "google") {
+        if (!user.email || !isVerifiedGoogleProfile(profile)) return false;
         const email = user.email.trim().toLowerCase();
         const existing = await prisma.user.findUnique({
           where: { email },

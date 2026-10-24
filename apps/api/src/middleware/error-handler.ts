@@ -26,6 +26,18 @@ export async function errorHandlerPlugin(app: FastifyInstance): Promise<void> {
         err.statusCode >= 400 &&
         err.statusCode < 500
       ) {
+        if (err.statusCode === 429) {
+          req.errorCode = ERROR_CODES.rate_limited;
+          return reply
+            .code(429)
+            .send(
+              apiError(
+                ERROR_CODES.rate_limited,
+                "Too many requests",
+                requestId,
+              ),
+            );
+        }
         req.errorCode = ERROR_CODES.validation_error;
         return reply
           .code(err.statusCode)

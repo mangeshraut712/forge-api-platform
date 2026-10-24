@@ -2,6 +2,12 @@
 
 import { useState } from "react";
 import { revokeApiKeyAction, rotateApiKeyAction } from "@/lib/key-actions";
+import {
+  canRevokeKey,
+  canRotateKey,
+  keyStatus,
+  type KeyStatus,
+} from "@/lib/key-status";
 
 type KeyRow = {
   id: string;
@@ -11,35 +17,42 @@ type KeyRow = {
   scopes: string[];
   revokedAt: Date | string | null;
   graceEndsAt?: Date | string | null;
+  expiresAt?: Date | string | null;
   lastUsedAt: Date | string | null;
   createdAt: Date | string;
 };
 
-function isInGrace(key: KeyRow, now = Date.now()): boolean {
-  if (!key.revokedAt || !key.graceEndsAt) return false;
-  return new Date(key.graceEndsAt).getTime() > now;
-}
-
-function statusLabel(key: KeyRow): {
+function statusLabel(status: KeyStatus): {
   label: string;
   className: string;
   style?: React.CSSProperties;
 } {
-  if (isInGrace(key)) {
-    return {
-      label: "Grace",
-      className: "badge",
-      style: { background: "#713f12", color: "#fbbf24" },
-    };
+  switch (status) {
+    case "grace":
+      return {
+        label: "Grace",
+        className: "badge",
+        style: { background: "#713f12", color: "#fbbf24" },
+      };
+    case "revoked":
+      return { label: "Revoked", className: "badge badge-revoked" };
+    case "expired":
+      return {
+        label: "Expired",
+        className: "badge",
+        style: { background: "#3f3f46", color: "#e4e4e7" },
+      };
+    case "active":
+      return {
+        label: "Active",
+        className: "badge",
+        style: { background: "#14532d", color: "#4ade80" },
+      };
+    default: {
+      const unreachable: never = status;
+      return unreachable;
+    }
   }
-  if (key.revokedAt) {
-    return { label: "Revoked", className: "badge badge-revoked" };
-  }
-  return {
-    label: "Active",
-    className: "badge",
-    style: { background: "#14532d", color: "#4ade80" },
-  };
 }
 
 export default function KeyList({
@@ -107,13 +120,7 @@ export default function KeyList({
   return (
     <div>
       {error && (
-        <div
-          style={{
-            color: "#f87171",
-            marginBottom: "0.75rem",
-            fontSize: "0.85rem",
-          }}
-        >
+        <div id="key-list-error" role="alert" className="form-error">
           {error}
         </div>
       )}
@@ -141,90 +148,103 @@ export default function KeyList({
         </div>
       )}
 
-      <table>
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Env</th>
-            <th>Prefix</th>
-            <th>Scopes</th>
-            <th>Status</th>
-            <th>Last used</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {keys.map((key) => {
-            const status = statusLabel(key);
-            const actionable = !key.revokedAt || isInGrace(key);
-            return (
-              <tr key={key.id}>
-                <td>{key.name}</td>
-                <td>
-                  <span
-                    className={`badge ${key.environment === "LIVE" ? "badge-live" : "badge-test"}`}
-                  >
-                    {key.environment}
-                  </span>
-                </td>
-                <td style={{ fontFamily: "monospace", fontSize: "0.85rem" }}>
-                  {key.keyPrefix}...
-                </td>
-                <td style={{ fontSize: "0.8rem" }}>{key.scopes.join(", ")}</td>
-                <td>
-                  <span className={status.className} style={status.style}>
-                    {status.label}
-                  </span>
-                  {isInGrace(key) && key.graceEndsAt && (
-                    <div
-                      style={{
-                        fontSize: "0.7rem",
-                        color: "#666",
-                        marginTop: "0.15rem",
-                      }}
+      <div className="table-wrap">
+        <table>
+          <caption className="sr-only">API keys</caption>
+          <thead>
+            <tr>
+              <th scope="col">Name</th>
+              <th scope="col">Env</th>
+              <th scope="col">Prefix</th>
+              <th scope="col">Scopes</th>
+              <th scope="col">Status</th>
+              <th scope="col">Last used</th>
+              <th scope="col">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {keys.map((key) => {
+              const status = keyStatus(key);
+              const label = statusLabel(status);
+              const showRotate = canRotateKey(status);
+              const showRevoke = canRevokeKey(status);
+              return (
+                <tr key={key.id}>
+                  <td>{key.name}</td>
+                  <td>
+                    <span
+                      className={`badge ${key.environment === "LIVE" ? "badge-live" : "badge-test"}`}
                     >
-                      until {new Date(key.graceEndsAt).toLocaleDateString()}
-                    </div>
-                  )}
-                </td>
-                <td style={{ fontSize: "0.8rem", color: "#666" }}>
-                  {key.lastUsedAt
-                    ? new Date(key.lastUsedAt).toLocaleDateString()
-                    : "Never"}
-                </td>
-                <td style={{ display: "flex", gap: "0.5rem" }}>
-                  {actionable && (
-                    <>
-                      {!key.revokedAt && (
-                        <button
-                          type="button"
-                          onClick={() => handleRotate(key.id)}
-                          className="btn"
-                          disabled={rotating === key.id}
-                        >
-                          {rotating === key.id ? "Rotating..." : "Rotate"}
-                        </button>
-                      )}
+                      {key.environment}
+                    </span>
+                  </td>
+                  <td style={{ fontFamily: "monospace", fontSize: "0.85rem" }}>
+                    {key.keyPrefix}...
+                  </td>
+                  <td style={{ fontSize: "0.8rem" }}>
+                    {key.scopes.join(", ")}
+                  </td>
+                  <td>
+                    <span className={label.className} style={label.style}>
+                      {label.label}
+                    </span>
+                    {status === "grace" && key.graceEndsAt && (
+                      <div
+                        style={{
+                          fontSize: "0.7rem",
+                          color: "#a3a3a3",
+                          marginTop: "0.15rem",
+                        }}
+                      >
+                        until {new Date(key.graceEndsAt).toLocaleDateString()}
+                      </div>
+                    )}
+                  </td>
+                  <td style={{ fontSize: "0.8rem", color: "#a3a3a3" }}>
+                    {key.lastUsedAt
+                      ? new Date(key.lastUsedAt).toLocaleDateString()
+                      : "Never"}
+                  </td>
+                  <td style={{ display: "flex", gap: "0.5rem" }}>
+                    {showRotate && (
+                      <button
+                        type="button"
+                        onClick={() => handleRotate(key.id)}
+                        className="btn"
+                        disabled={rotating === key.id}
+                        aria-busy={rotating === key.id}
+                        aria-label={`Rotate ${key.name}`}
+                      >
+                        {rotating === key.id ? "Rotating..." : "Rotate"}
+                      </button>
+                    )}
+                    {showRevoke && (
                       <button
                         type="button"
                         onClick={() => handleRevoke(key.id)}
                         className="btn btn-danger"
                         disabled={revoking === key.id}
+                        aria-busy={revoking === key.id}
+                        aria-label={
+                          status === "grace"
+                            ? `End grace for ${key.name}`
+                            : `Revoke ${key.name}`
+                        }
                       >
                         {revoking === key.id
                           ? "Revoking..."
-                          : isInGrace(key)
+                          : status === "grace"
                             ? "End grace"
                             : "Revoke"}
                       </button>
-                    </>
-                  )}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

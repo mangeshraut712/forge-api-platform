@@ -17,6 +17,14 @@ import {
 } from "@forge/shared";
 import { createHash, randomBytes } from "node:crypto";
 import { requireSessionUser } from "./session";
+import {
+  publicActionError,
+  validateExpiresAt,
+  validateKeyEnvironment,
+  validateKeyName,
+  validateProjectName,
+  validateProjectSlug,
+} from "./validators";
 
 function hashKey(raw: string, pepper = getHashPepper()): string {
   return createHash("sha256").update(`${pepper}${raw}`).digest("hex");
@@ -58,33 +66,22 @@ export async function createApiKeyAction(params: {
     const user = await requireSessionUser();
     await assertProjectOwner(prisma, params.projectId, user.id);
 
-    const name = params.name.trim();
-    if (!name) {
-      return { success: false, error: "Key name is required" };
+    const nameResult = validateKeyName(params.name);
+    if (!nameResult.ok) return { success: false, error: nameResult.error };
+    const name = nameResult.value;
+    const environmentResult = validateKeyEnvironment(params.environment);
+    if (!environmentResult.ok) {
+      return { success: false, error: environmentResult.error };
     }
-    if (name.length > 100) {
-      return {
-        success: false,
-        error: "Key name must be 100 characters or fewer",
-      };
-    }
-    if (params.environment !== "TEST" && params.environment !== "LIVE") {
-      return { success: false, error: "Invalid key environment" };
-    }
-    if (!isValidScopes(params.scopes)) {
+    const scopes = [...new Set(params.scopes)];
+    if (!isValidScopes(scopes)) {
       return { success: false, error: "At least one valid scope is required" };
     }
 
-    let expiresAt: Date | null = null;
-    if (params.expiresAt) {
-      expiresAt = new Date(params.expiresAt);
-      if (Number.isNaN(expiresAt.getTime())) {
-        return { success: false, error: "Expiration must be a valid date" };
-      }
-      if (expiresAt.getTime() <= Date.now()) {
-        return { success: false, error: "Expiration must be in the future" };
-      }
-    }
+    const expiresResult = validateExpiresAt(params.expiresAt);
+    if (!expiresResult.ok)
+      return { success: false, error: expiresResult.error };
+    const expiresAt = expiresResult.value;
 
     const rawKey = generateKey(params.environment);
 
@@ -95,7 +92,7 @@ export async function createApiKeyAction(params: {
         environment: params.environment,
         keyPrefix: visibleKeyPrefix(rawKey),
         keyHash: hashKey(rawKey),
-        scopes: params.scopes,
+        scopes,
         ...(expiresAt ? { expiresAt } : {}),
       },
     });
@@ -105,7 +102,7 @@ export async function createApiKeyAction(params: {
   } catch (err) {
     return {
       success: false,
-      error: err instanceof Error ? err.message : "Failed to create key",
+      error: publicActionError(err, "Failed to create key"),
     };
   }
 }
@@ -145,7 +142,7 @@ export async function revokeApiKeyAction(params: {
   } catch (err) {
     return {
       success: false,
-      error: err instanceof Error ? err.message : "Failed to revoke key",
+      error: publicActionError(err, "Failed to revoke key"),
     };
   }
 }
@@ -165,6 +162,9 @@ export async function rotateApiKeyAction(params: {
     });
     if (!existing) {
       return { success: false, error: "Key not found" };
+    }
+    if (existing.expiresAt && existing.expiresAt.getTime() <= Date.now()) {
+      return { success: false, error: "Cannot rotate an expired key" };
     }
     // Only fully-revoked keys (past grace) cannot be rotated
     if (
@@ -206,7 +206,7 @@ export async function rotateApiKeyAction(params: {
   } catch (err) {
     return {
       success: false,
-      error: err instanceof Error ? err.message : "Failed to rotate key",
+      error: publicActionError(err, "Failed to rotate key"),
     };
   }
 }
@@ -220,22 +220,12 @@ export async function createProjectAction(params: {
   try {
     const user = await requireSessionUser();
 
-    const name = params.name.trim();
-    const slug = params.slug
-      .toLowerCase()
-      .trim()
-      .replace(/[^a-z0-9-]+/g, "-")
-      .replace(/^-+|-+$/g, "");
-
-    if (!name) {
-      return { success: false, error: "Project name is required" };
-    }
-    if (!slug || slug.length < 2) {
-      return { success: false, error: "Slug must be at least 2 characters" };
-    }
-    if (slug.length > 63) {
-      return { success: false, error: "Slug must be 63 characters or fewer" };
-    }
+    const nameResult = validateProjectName(params.name);
+    if (!nameResult.ok) return { success: false, error: nameResult.error };
+    const slugResult = validateProjectSlug(params.slug);
+    if (!slugResult.ok) return { success: false, error: slugResult.error };
+    const name = nameResult.value;
+    const slug = slugResult.value;
 
     const project = await prisma.project.create({
       data: {
@@ -262,7 +252,7 @@ export async function createProjectAction(params: {
     }
     return {
       success: false,
-      error: err instanceof Error ? err.message : "Failed to create project",
+      error: publicActionError(err, "Failed to create project"),
     };
   }
 }

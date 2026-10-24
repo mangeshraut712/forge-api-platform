@@ -21,34 +21,49 @@ export async function authPlugin(app: FastifyInstance): Promise<void> {
     global: true,
     max: 100,
     timeWindow: "1 minute",
+    // Probes must not consume or be blocked by the caller rate limit.
+    allowList: (req) => isPublicRoute(req.url),
+    // Quota middleware owns X-RateLimit-* so the two limiters do not overwrite
+    // each other. Retry-After still tells clients when they can try again.
+    addHeaders: {
+      "x-ratelimit-limit": false,
+      "x-ratelimit-remaining": false,
+      "x-ratelimit-reset": false,
+      "retry-after": true,
+    },
   });
 
-  app.addHook("onRequest", async (req: FastifyRequest, reply: FastifyReply) => {
-    // Skip auth for health checks
-    if (isPublicRoute(req.url)) {
-      return;
-    }
-
-    const rawKey = extractBearer(req);
-    if (!rawKey) {
-      return sendApiError(
-        reply,
-        unauthorized("Missing or malformed Authorization header"),
-        req.requestId,
-      );
-    }
-
-    try {
-      req.auth = await verifyApiKey(rawKey);
-    } catch (err) {
-      if (err instanceof ApiError) {
-        return sendApiError(reply, err, req.requestId);
+  // preParsing runs after the route onRequest rate-limit hook, so rejected
+  // credentials still consume the IP budget, and before the body is parsed.
+  app.addHook(
+    "preParsing",
+    async (req: FastifyRequest, reply: FastifyReply) => {
+      // Skip auth for health checks
+      if (isPublicRoute(req.url)) {
+        return;
       }
-      return sendApiError(
-        reply,
-        unauthorized("Authentication failed"),
-        req.requestId,
-      );
-    }
-  });
+
+      const rawKey = extractBearer(req);
+      if (!rawKey) {
+        return sendApiError(
+          reply,
+          unauthorized("Missing or malformed Authorization header"),
+          req.requestId,
+        );
+      }
+
+      try {
+        req.auth = await verifyApiKey(rawKey);
+      } catch (err) {
+        if (err instanceof ApiError) {
+          return sendApiError(reply, err, req.requestId);
+        }
+        return sendApiError(
+          reply,
+          unauthorized("Authentication failed"),
+          req.requestId,
+        );
+      }
+    },
+  );
 }

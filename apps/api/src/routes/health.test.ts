@@ -143,6 +143,16 @@ describe("health routes", () => {
       expect(health.json()).toMatchObject({ status: "ok" });
     });
 
+    it("returns 503 when a dependency check hangs", async () => {
+      mocks.ping.mockImplementation(() => new Promise(() => {}));
+
+      const response = await app.inject({ method: "GET", url: "/ready" });
+
+      expect(response.statusCode).toBe(503);
+      expect(response.json()).toMatchObject({ status: "not_ready" });
+      expect(JSON.stringify(response.json())).not.toContain("timeout");
+    });
+
     it("turns a synchronous dependency failure into an internal error", async () => {
       const spy = vi.spyOn(console, "error").mockImplementation(() => {});
       mocks.queryRaw.mockImplementation(() => {

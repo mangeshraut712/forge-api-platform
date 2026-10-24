@@ -108,9 +108,11 @@ describe("todo service", () => {
 
   describe("listTodos", () => {
     it("turns an unknown cursor into a validation error", async () => {
+      const findMany = vi.fn();
       const db = {
         todo: {
-          findMany: vi.fn().mockRejectedValue({ code: "P2025" }),
+          findFirst: vi.fn().mockResolvedValue(null),
+          findMany,
         },
       } as unknown as PrismaClient;
 
@@ -121,6 +123,7 @@ describe("todo service", () => {
         code: "validation_error",
         message: "Invalid pagination cursor",
       });
+      expect(findMany).not.toHaveBeenCalled();
     });
 
     it("rethrows unexpected query failures", async () => {
@@ -145,6 +148,11 @@ describe("todo service", () => {
     });
 
     it("returns a cursor when another page exists", async () => {
+      const cursorCreatedAt = new Date("2026-03-03T00:00:00.000Z");
+      const findFirst = vi.fn().mockResolvedValue({
+        id: "d",
+        createdAt: cursorCreatedAt,
+      });
       const findMany = vi
         .fn()
         .mockResolvedValue([
@@ -152,7 +160,7 @@ describe("todo service", () => {
           todoRow({ id: "b" }),
           todoRow({ id: "a" }),
         ]);
-      const db = { todo: { findMany } } as unknown as PrismaClient;
+      const db = { todo: { findFirst, findMany } } as unknown as PrismaClient;
 
       await expect(
         listTodos("proj_1", { limit: 2, cursor: "d" }, db),
@@ -163,12 +171,20 @@ describe("todo service", () => {
         ],
         nextCursor: "b",
       });
+      expect(findFirst).toHaveBeenCalledWith({
+        where: { id: "d", projectId: "proj_1" },
+        select: { id: true, createdAt: true },
+      });
       expect(findMany).toHaveBeenCalledWith({
-        where: { projectId: "proj_1" },
+        where: {
+          projectId: "proj_1",
+          OR: [
+            { createdAt: { lt: cursorCreatedAt } },
+            { createdAt: cursorCreatedAt, id: { lt: "d" } },
+          ],
+        },
         orderBy: [{ createdAt: "desc" }, { id: "desc" }],
         take: 3,
-        cursor: { id: "d" },
-        skip: 1,
       });
       expect(prisma.todo.findMany).not.toHaveBeenCalled();
     });
@@ -242,6 +258,19 @@ describe("todo service", () => {
       ).rejects.toMatchObject({ statusCode: 404, message: "Todo not found" });
       expect(update).not.toHaveBeenCalled();
     });
+
+    it("maps a concurrent delete to not found", async () => {
+      const db = {
+        todo: {
+          findFirst: vi.fn().mockResolvedValue(todoRow()),
+          update: vi.fn().mockRejectedValue({ code: "P2025" }),
+        },
+      } as unknown as PrismaClient;
+
+      await expect(
+        updateTodo("proj_1", "todo_1", { title: "Next" }, db),
+      ).rejects.toMatchObject({ statusCode: 404, message: "Todo not found" });
+    });
   });
 
   describe("deleteTodo", () => {
@@ -266,6 +295,16 @@ describe("todo service", () => {
         code: "not_found",
       });
       expect(prisma.todo.delete).not.toHaveBeenCalled();
+    });
+
+    it("maps a concurrent delete to not found", async () => {
+      prisma.todo.findFirst.mockResolvedValue(todoRow());
+      prisma.todo.delete.mockRejectedValue({ code: "P2025" });
+
+      await expect(deleteTodo("proj_1", "todo_1")).rejects.toMatchObject({
+        statusCode: 404,
+        code: "not_found",
+      });
     });
   });
 });

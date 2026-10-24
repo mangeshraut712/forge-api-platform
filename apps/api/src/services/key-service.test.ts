@@ -12,6 +12,7 @@ const { prisma, issuedSecret } = vi.hoisted(() => ({
   prisma: {
     apiKey: {
       findFirst: vi.fn(),
+      findUnique: vi.fn(),
       update: vi.fn(),
       create: vi.fn(),
     },
@@ -39,6 +40,11 @@ const issuedLiveToken = `forge_live_${issuedSecret.toString("hex")}`;
 
 const NOW = new Date("2026-06-01T00:00:00.000Z");
 
+function visibleProject() {
+  const { owner: _owner, ...project } = keyRecord().project;
+  return project;
+}
+
 function keyRecord(overrides: Record<string, unknown> = {}) {
   return {
     id: "key_1",
@@ -61,6 +67,7 @@ function keyRecord(overrides: Record<string, unknown> = {}) {
       plan: "FREE" as const,
       customDailyLimit: null as number | null,
       customMonthlyLimit: null as number | null,
+      owner: { deletedAt: null as Date | null },
     },
     ...overrides,
   };
@@ -69,6 +76,7 @@ function keyRecord(overrides: Record<string, unknown> = {}) {
 describe("key service", () => {
   beforeEach(() => {
     prisma.apiKey.findFirst.mockReset();
+    prisma.apiKey.findUnique.mockReset();
     prisma.apiKey.update.mockReset();
     prisma.apiKey.create.mockReset();
     prisma.$transaction.mockReset();
@@ -86,18 +94,18 @@ describe("key service", () => {
         code: "unauthorized",
         message: "Invalid API key format",
       });
-      expect(prisma.apiKey.findFirst).not.toHaveBeenCalled();
+      expect(prisma.apiKey.findUnique).not.toHaveBeenCalled();
     });
 
     it("rejects an unknown key", async () => {
       const raw = generateKey("TEST");
-      prisma.apiKey.findFirst.mockResolvedValue(null);
+      prisma.apiKey.findUnique.mockResolvedValue(null);
 
       await expect(verifyApiKey(raw)).rejects.toMatchObject({
         statusCode: 401,
         message: "Unknown API key",
       });
-      expect(prisma.apiKey.findFirst).toHaveBeenCalledWith({
+      expect(prisma.apiKey.findUnique).toHaveBeenCalledWith({
         where: { keyHash: hashKey(raw) },
         include: {
           project: {
@@ -108,6 +116,7 @@ describe("key service", () => {
               plan: true,
               customDailyLimit: true,
               customMonthlyLimit: true,
+              owner: { select: { deletedAt: true } },
             },
           },
         },
@@ -117,12 +126,12 @@ describe("key service", () => {
 
     it("returns the auth context and records last use", async () => {
       const raw = generateKey("TEST");
-      prisma.apiKey.findFirst.mockResolvedValue(
+      prisma.apiKey.findUnique.mockResolvedValue(
         keyRecord({ scopes: ["todos:write"] }),
       );
 
       await expect(verifyApiKey(raw)).resolves.toEqual({
-        project: keyRecord().project,
+        project: visibleProject(),
         apiKey: {
           id: "key_1",
           name: "ci",
@@ -139,7 +148,7 @@ describe("key service", () => {
 
     it("still authenticates when the last-use update fails", async () => {
       const raw = generateKey("TEST");
-      prisma.apiKey.findFirst.mockResolvedValue(keyRecord());
+      prisma.apiKey.findUnique.mockResolvedValue(keyRecord());
       prisma.apiKey.update.mockRejectedValue(new Error("write failed"));
 
       await expect(verifyApiKey(raw)).resolves.toMatchObject({
@@ -150,7 +159,7 @@ describe("key service", () => {
 
     it("rejects a revoked key with no remaining grace", async () => {
       const raw = generateKey("TEST");
-      prisma.apiKey.findFirst.mockResolvedValue(
+      prisma.apiKey.findUnique.mockResolvedValue(
         keyRecord({
           revokedAt: new Date("2026-01-01T00:00:00.000Z"),
           graceEndsAt: null,
@@ -170,7 +179,7 @@ describe("key service", () => {
       vi.setSystemTime(NOW);
       const raw = generateKey("LIVE");
 
-      prisma.apiKey.findFirst.mockResolvedValue(
+      prisma.apiKey.findUnique.mockResolvedValue(
         keyRecord({
           environment: "LIVE",
           revokedAt: new Date("2026-05-01T00:00:00.000Z"),
@@ -181,8 +190,9 @@ describe("key service", () => {
         apiKey: { environment: "LIVE" },
       });
 
-      prisma.apiKey.findFirst.mockResolvedValue(
+      prisma.apiKey.findUnique.mockResolvedValue(
         keyRecord({
+          environment: "LIVE",
           revokedAt: new Date("2026-05-01T00:00:00.000Z"),
           graceEndsAt: NOW,
         }),
@@ -191,13 +201,18 @@ describe("key service", () => {
         code: "key_revoked",
       });
 
-      prisma.apiKey.findFirst.mockResolvedValue(keyRecord({ expiresAt: NOW }));
+      prisma.apiKey.findUnique.mockResolvedValue(
+        keyRecord({ environment: "LIVE", expiresAt: NOW }),
+      );
       await expect(verifyApiKey(raw)).resolves.toMatchObject({
         apiKey: { id: "key_1" },
       });
 
-      prisma.apiKey.findFirst.mockResolvedValue(
-        keyRecord({ expiresAt: new Date("2026-05-31T23:59:59.999Z") }),
+      prisma.apiKey.findUnique.mockResolvedValue(
+        keyRecord({
+          environment: "LIVE",
+          expiresAt: new Date("2026-05-31T23:59:59.999Z"),
+        }),
       );
       await expect(verifyApiKey(raw)).rejects.toMatchObject({
         statusCode: 403,
@@ -206,9 +221,41 @@ describe("key service", () => {
       });
     });
 
+    it("rejects a key whose prefix does not match the stored environment", async () => {
+      const raw = generateKey("LIVE");
+      prisma.apiKey.findUnique.mockResolvedValue(
+        keyRecord({ environment: "TEST" }),
+      );
+
+      await expect(verifyApiKey(raw)).rejects.toMatchObject({
+        statusCode: 401,
+        code: "unauthorized",
+        message: "Invalid API key",
+      });
+      expect(prisma.apiKey.update).not.toHaveBeenCalled();
+    });
+
+    it("rejects a key after the project owner is deleted", async () => {
+      const raw = generateKey("TEST");
+      prisma.apiKey.findUnique.mockResolvedValue(
+        keyRecord({
+          project: {
+            ...keyRecord().project,
+            owner: { deletedAt: new Date("2026-05-01T00:00:00.000Z") },
+          },
+        }),
+      );
+
+      await expect(verifyApiKey(raw)).rejects.toMatchObject({
+        statusCode: 403,
+        code: "key_revoked",
+      });
+      expect(prisma.apiKey.update).not.toHaveBeenCalled();
+    });
+
     it("reports revocation before expiry", async () => {
       const raw = generateKey("TEST");
-      prisma.apiKey.findFirst.mockResolvedValue(
+      prisma.apiKey.findUnique.mockResolvedValue(
         keyRecord({
           revokedAt: new Date("2026-01-01T00:00:00.000Z"),
           graceEndsAt: null,
@@ -377,6 +424,21 @@ describe("key service", () => {
           graceEndsAt: new Date("2026-06-02T00:00:00.000Z"),
         },
       });
+    });
+
+    it("rejects an expired key", async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(NOW);
+      prisma.apiKey.findFirst.mockResolvedValue(
+        keyRecord({ expiresAt: new Date("2026-05-31T00:00:00.000Z") }),
+      );
+
+      await expect(rotateApiKey("proj_1", "key_1")).rejects.toMatchObject({
+        statusCode: 409,
+        code: "conflict",
+        message: "Cannot rotate an expired key",
+      });
+      expect(prisma.$transaction).not.toHaveBeenCalled();
     });
 
     it("rejects a missing key", async () => {

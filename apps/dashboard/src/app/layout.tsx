@@ -17,7 +17,7 @@ export default function RootLayout({
     <html lang="en">
       <body>
         <Providers>
-          <nav className="navbar">
+          <nav className="navbar" aria-label="Main">
             <a href="/" className="logo">
               ForgeAPI
             </a>

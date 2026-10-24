@@ -36,15 +36,12 @@ export default function CreateProjectForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit}>
+    <form
+      onSubmit={handleSubmit}
+      aria-describedby={error ? "project-error" : undefined}
+    >
       {error && (
-        <div
-          style={{
-            color: "#f87171",
-            marginBottom: "0.75rem",
-            fontSize: "0.85rem",
-          }}
-        >
+        <div id="project-error" role="alert" className="form-error">
           {error}
         </div>
       )}
@@ -59,6 +56,8 @@ export default function CreateProjectForm() {
         }}
         placeholder="My App"
         required
+        maxLength={200}
+        aria-invalid={error ? true : undefined}
       />
       <label htmlFor="slug">Slug</label>
       <input
@@ -73,7 +72,12 @@ export default function CreateProjectForm() {
         pattern={"[a-z0-9\\-]{2,}"}
         title="Lowercase letters, numbers, and hyphens (min 2 chars)"
       />
-      <button type="submit" className="btn" disabled={loading}>
+      <button
+        type="submit"
+        className="btn"
+        disabled={loading}
+        aria-busy={loading}
+      >
         {loading ? "Creating..." : "Create project"}
       </button>
     </form>

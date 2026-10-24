@@ -9,6 +9,15 @@ import { notFound, validationError } from "../lib/errors.js";
 
 type TodoDatabase = Pick<PrismaClient, "todo">;
 
+function isPrismaCode(err: unknown, code: string): boolean {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    "code" in err &&
+    (err as { code?: string }).code === code
+  );
+}
+
 function toTodo(row: {
   id: string;
   title: string;
@@ -53,22 +62,38 @@ export async function listTodos(
   query: { limit: number; cursor?: string },
   db: TodoDatabase = prisma,
 ): Promise<TodoListResponse> {
-  // Stable cursor: order by createdAt desc, id desc so ties don't skip/duplicate rows
+  // Keyset pagination stays inside the project. A cursor id from another
+  // project is rejected instead of seeking through the global id order.
+  let cursorFilter: {
+    OR: Array<
+      { createdAt: { lt: Date } } | { createdAt: Date; id: { lt: string } }
+    >;
+  } | null = null;
+  if (query.cursor) {
+    const cursorRow = await db.todo.findFirst({
+      where: { id: query.cursor, projectId },
+      select: { id: true, createdAt: true },
+    });
+    if (!cursorRow) {
+      throw validationError("Invalid pagination cursor");
+    }
+    cursorFilter = {
+      OR: [
+        { createdAt: { lt: cursorRow.createdAt } },
+        { createdAt: cursorRow.createdAt, id: { lt: cursorRow.id } },
+      ],
+    };
+  }
+
   let rows;
   try {
     rows = await db.todo.findMany({
-      where: { projectId },
+      where: cursorFilter ? { projectId, ...cursorFilter } : { projectId },
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       take: query.limit + 1,
-      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
     });
   } catch (err) {
-    if (
-      err &&
-      typeof err === "object" &&
-      "code" in err &&
-      (err as { code?: string }).code === "P2025"
-    ) {
+    if (isPrismaCode(err, "P2025")) {
       throw validationError("Invalid pagination cursor");
     }
     throw err;
@@ -96,14 +121,21 @@ export async function updateTodo(
   });
   if (!existing) throw notFound("Todo not found");
 
-  const row = await db.todo.update({
-    where: { id },
-    data: {
-      ...(input.title !== undefined ? { title: input.title } : {}),
-      ...(input.completed !== undefined ? { completed: input.completed } : {}),
-    },
-  });
-  return toTodo(row);
+  try {
+    const row = await db.todo.update({
+      where: { id },
+      data: {
+        ...(input.title !== undefined ? { title: input.title } : {}),
+        ...(input.completed !== undefined
+          ? { completed: input.completed }
+          : {}),
+      },
+    });
+    return toTodo(row);
+  } catch (err) {
+    if (isPrismaCode(err, "P2025")) throw notFound("Todo not found");
+    throw err;
+  }
 }
 
 export async function deleteTodo(projectId: string, id: string): Promise<void> {
@@ -111,5 +143,10 @@ export async function deleteTodo(projectId: string, id: string): Promise<void> {
     where: { id, projectId },
   });
   if (!existing) throw notFound("Todo not found");
-  await prisma.todo.delete({ where: { id } });
+  try {
+    await prisma.todo.delete({ where: { id } });
+  } catch (err) {
+    if (isPrismaCode(err, "P2025")) throw notFound("Todo not found");
+    throw err;
+  }
 }

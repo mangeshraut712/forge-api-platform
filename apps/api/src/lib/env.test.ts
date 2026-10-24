@@ -76,6 +76,7 @@ describe("API environment validation", () => {
       host: "127.0.0.1",
       apiKeyHashPepper: "p".repeat(32),
       quotaFailMode: "closed",
+      trustProxy: false,
       corsOrigins: ["https://a.example", "https://b.example"],
       databaseUrl: "postgresql://example/forge",
       redisUrl: "redis://example:6379",
@@ -112,7 +113,20 @@ describe("API environment validation", () => {
       redisUrl: "redis://localhost:6379",
       quotaFailMode: "open",
       apiKeyHashPepper: "",
+      trustProxy: false,
     });
+  });
+
+  it("parses the trusted proxy hop count and rejects junk", async () => {
+    const loaded = await loadEnv({ NODE_ENV: "test", TRUST_PROXY: "1" });
+    expect(loaded.env.trustProxy).toBe(1);
+    const disabled = await loadEnv({ NODE_ENV: "test", TRUST_PROXY: "false" });
+    expect(disabled.env.trustProxy).toBe(false);
+    await expect(
+      loadEnv({ NODE_ENV: "test", TRUST_PROXY: "yes" }),
+    ).rejects.toThrow(
+      'TRUST_PROXY must be "true", "false", or a hop count from 0 to 10',
+    );
   });
 
   it("uses the default origins when CORS_ORIGINS is empty", async () => {

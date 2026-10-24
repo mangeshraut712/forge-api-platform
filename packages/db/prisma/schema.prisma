@@ -97,7 +97,7 @@ model ApiKey {
   name          String
   environment   KeyEnv
   keyPrefix     String
-  keyHash       String
+  keyHash       String    @unique
   scopes        String[]
   expiresAt     DateTime?
   revokedAt     DateTime?
@@ -111,7 +111,6 @@ model ApiKey {
 
   @@index([keyPrefix])
   @@index([projectId])
-  @@index([keyHash])
 }
 
 model Todo {
@@ -124,7 +123,7 @@ model Todo {
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
-  @@index([projectId, createdAt])
+  @@index([projectId, createdAt, id])
 }
 
 model IdempotencyRecord {

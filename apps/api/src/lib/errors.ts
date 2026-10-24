@@ -30,6 +30,10 @@ export function forbidden(message = "Forbidden"): ApiError {
   return new ApiError(403, ERROR_CODES.forbidden, message);
 }
 
+export function insufficientScope(message: string): ApiError {
+  return new ApiError(403, ERROR_CODES.insufficient_scope, message);
+}
+
 export function notFound(message = "Not found"): ApiError {
   return new ApiError(404, ERROR_CODES.not_found, message);
 }

@@ -4,25 +4,17 @@
  */
 import { getServerSession } from "next-auth";
 import { authOptions } from "./auth";
+import { sessionUserFromSession, type SessionUser } from "./session-user";
 
-export type SessionUser = {
-  id: string;
-  email?: string | null;
-  name?: string | null;
-};
+export type { SessionUser } from "./session-user";
+export { sessionUserFromSession } from "./session-user";
 
 /**
  * Returns the authenticated user or null when unauthenticated.
  */
 export async function getSessionUser(): Promise<SessionUser | null> {
   const session = await getServerSession(authOptions);
-  const id = (session?.user as { id?: string } | undefined)?.id;
-  if (!session?.user || !id) return null;
-  return {
-    id,
-    email: session.user.email,
-    name: session.user.name,
-  };
+  return sessionUserFromSession(session);
 }
 
 /**

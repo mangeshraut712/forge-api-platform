@@ -6,9 +6,11 @@ import { useState } from "react";
 export default function LoginForm({
   hasGoogle,
   hasDevLogin,
+  error,
 }: {
   hasGoogle: boolean;
   hasDevLogin: boolean;
+  error: string | null;
 }) {
   const [email, setEmail] = useState("dev@forge.local");
   const [loading, setLoading] = useState(false);
@@ -21,6 +23,11 @@ export default function LoginForm({
 
   return (
     <div>
+      {error && (
+        <div id="login-error" role="alert" className="form-error">
+          {error}
+        </div>
+      )}
       {hasGoogle && (
         <>
           <button
@@ -29,7 +36,7 @@ export default function LoginForm({
             style={{
               width: "100%",
               marginBottom: "1rem",
-              background: "#4285f4",
+              background: "#1d4ed8",
             }}
             onClick={() => signIn("google", { callbackUrl: "/projects" })}
           >
@@ -39,7 +46,7 @@ export default function LoginForm({
             <div
               style={{
                 textAlign: "center",
-                color: "#666",
+                color: "#a3a3a3",
                 marginBottom: "1rem",
                 fontSize: "0.85rem",
               }}
@@ -51,7 +58,10 @@ export default function LoginForm({
       )}
 
       {hasDevLogin && (
-        <form onSubmit={handleSubmit}>
+        <form
+          onSubmit={handleSubmit}
+          aria-describedby={error ? "login-error" : undefined}
+        >
           <label htmlFor="email">Email</label>
           <input
             id="email"
@@ -60,8 +70,15 @@ export default function LoginForm({
             onChange={(e) => setEmail(e.target.value)}
             placeholder="you@example.com"
             required
+            autoComplete="email"
+            aria-invalid={error ? true : undefined}
           />
-          <button type="submit" className="btn" disabled={loading}>
+          <button
+            type="submit"
+            className="btn"
+            disabled={loading}
+            aria-busy={loading}
+          >
             {loading ? "Signing in..." : "Sign in"}
           </button>
         </form>

@@ -380,7 +380,7 @@ When Redis is unavailable, behavior is controlled by:
 QUOTA_FAIL_MODE=open
 ```
 
-Use <code>open</code> to prioritize availability or <code>closed</code> to prioritize strict quota enforcement.
+Use <code>open</code> to prioritize availability or <code>closed</code> to prioritize strict quota enforcement. Closed mode responds with HTTP 503 and <code>quota_unavailable</code>, which is distinct from a project that has actually used its quota.
 
 ## Development commands
 
@@ -428,8 +428,9 @@ Important production values include:
 - A long random <code>AUTH_SECRET</code>
 - A separate <code>API_KEY_HASH_PEPPER</code> with at least 32 characters
 - Production PostgreSQL and Redis URLs
-- Explicit <code>CORS_ORIGINS</code>
-- <code>QUOTA_FAIL_MODE</code> selected according to availability requirements
+- Explicit <code>CORS_ORIGINS</code> (cookie credentials are not allowed)
+- <code>TRUST_PROXY</code> left <code>false</code> unless the API sits behind a known proxy, in which case set the hop count
+- <code>QUOTA_FAIL_MODE</code> selected according to availability requirements (<code>closed</code> returns HTTP 503 <code>quota_unavailable</code> when Redis is down)
 - Google OAuth credentials if Google login is enabled
 
 Never commit <code>.env</code>, API keys, OAuth secrets, or database credentials.
@@ -445,9 +446,12 @@ ForgeAPI applies several security controls:
 
 - API keys are hashed before storage.
 - API keys are validated for environment and format.
-- API routes require explicit scopes.
-- Project resources are ownership-scoped.
-- Deleted users are prevented from authenticating.
+- API routes require explicit scopes and return <code>insufficient_scope</code> when a key is missing one.
+- Project resources are ownership-scoped. Todo list cursors must belong to the same project.
+- Deleted users are prevented from authenticating, including keys that were still inside a rotation grace window.
+- The dashboard rejects unverified Google emails and requires <code>AUTH_SECRET</code> to be at least 32 characters in production.
+- IP rate limits do not apply to <code>/health</code> or <code>/ready</code>, and <code>TRUST_PROXY</code> defaults to false so clients cannot spoof <code>X-Forwarded-For</code>.
+- Request logs store the path without the query string.
 - Request IDs are generated and returned with errors.
 - Request bodies are size-limited.
 - Idempotency records are committed with their write side effects.

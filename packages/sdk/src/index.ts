@@ -128,6 +128,20 @@ export class ForgeClient {
     if (!API_KEY_PATTERN.test(opts.apiKey)) {
       throw new Error("ForgeClient: apiKey must be a valid ForgeAPI key");
     }
+    if (
+      opts.timeoutMs !== undefined &&
+      (!Number.isFinite(opts.timeoutMs) || opts.timeoutMs <= 0)
+    ) {
+      throw new Error("ForgeClient: timeoutMs must be a positive number");
+    }
+    if (
+      opts.maxRetries !== undefined &&
+      (!Number.isInteger(opts.maxRetries) ||
+        opts.maxRetries < 0 ||
+        opts.maxRetries > 5)
+    ) {
+      throw new Error("ForgeClient: maxRetries must be an integer from 0 to 5");
+    }
     this.apiKey = opts.apiKey;
     this.baseUrl = (opts.baseUrl ?? "http://localhost:4000").replace(/\/$/, "");
     this.fetchFn = opts.fetchImpl ?? globalThis.fetch;
@@ -207,6 +221,7 @@ export class ForgeClient {
       try {
         const res = await this.fetchFn(`${this.baseUrl}${path}`, {
           method,
+          redirect: "error",
           signal: controller.signal,
           headers: {
             Authorization: `Bearer ${this.apiKey}`,

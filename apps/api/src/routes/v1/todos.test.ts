@@ -137,7 +137,7 @@ describe("todo routes", () => {
 
       expect(response.statusCode).toBe(403);
       expect(response.json().error).toMatchObject({
-        code: "forbidden",
+        code: "insufficient_scope",
         message: "Missing required scope(s): todos:read",
       });
       expect(mocks.listTodos).not.toHaveBeenCalled();
@@ -146,7 +146,7 @@ describe("todo routes", () => {
           projectId: PROJECT_ID,
           apiKeyId: API_KEY_ID,
           statusCode: 403,
-          errorCode: "forbidden",
+          errorCode: "insufficient_scope",
         }),
       );
     });

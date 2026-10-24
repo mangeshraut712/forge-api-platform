@@ -37,16 +37,18 @@ The `API_KEY_HASH_PEPPER` is a server-side secret that prevents rainbow-table at
 ### Verify
 
 1. Incoming request includes `Authorization: Bearer forge_live_...`.
-2. The API hashes the raw key and looks it up by hash.
+2. The API hashes the raw key and looks it up by that unique hash.
 3. Checks:
    - Key exists
+   - The key prefix matches the stored environment
+   - The project owner has not been deleted
    - Not revoked (allows grace period for rotated keys)
    - Not expired
 4. `lastUsedAt` is updated asynchronously.
 
 ### Revoke
 
-Immediately invalidates a key. All further requests with that key return `403 forbidden`.
+Immediately invalidates a key, including one that is still inside a rotation grace window. Further requests return `403` with code `key_revoked`. Deleting a user revokes every key on that user's projects and clears any remaining grace window. Expired keys cannot be rotated.
 
 ### Rotate
 
