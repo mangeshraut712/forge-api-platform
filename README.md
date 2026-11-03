@@ -467,11 +467,12 @@ GitHub Actions runs on pushes and pull requests targeting <code>main</code>.
 The workflow performs:
 
 1. Frozen dependency installation
-2. Prisma client generation
-3. Formatting checks
-4. Typechecking
-5. Builds
-6. Tests
+2. Production dependency audit (`pnpm audit --prod`)
+3. Prisma client generation
+4. Formatting checks
+5. Typechecking
+6. Builds
+7. Tests
 
 ## Project status
 
