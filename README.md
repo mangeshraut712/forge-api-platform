@@ -297,7 +297,7 @@ curl "http://localhost:4000/v1/todos?limit=20" \
 
 Write requests support the <code>Idempotency-Key</code> header.
 
-Retrying a request with the same key and request body replays the original response. Reusing the same key with a different request body returns a conflict response.
+Retrying a request with the same key, method, path, and request body replays the original response. Reusing the same key with a different request body, or on a different method or todo, returns a conflict response.
 
 Idempotent write operations:
 

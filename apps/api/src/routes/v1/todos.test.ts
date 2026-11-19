@@ -371,7 +371,7 @@ describe("todo routes", () => {
       expect(mocks.runIdempotent).toHaveBeenCalledWith(
         PROJECT_ID,
         "key-1",
-        { title: "  Ship tests  " },
+        { request: "POST /v1/todos", body: { title: "  Ship tests  " } },
         expect.any(Function),
       );
       expect(mocks.createTodo).toHaveBeenCalledWith(
@@ -452,7 +452,7 @@ describe("todo routes", () => {
       expect(mocks.runIdempotent).toHaveBeenCalledWith(
         PROJECT_ID,
         "one,two",
-        { title: "Ship tests" },
+        { request: "POST /v1/todos", body: { title: "Ship tests" } },
         expect.any(Function),
       );
     });
@@ -693,6 +693,28 @@ describe("todo routes", () => {
         { title: "Next", completed: false },
         tx,
       );
+    });
+
+    it("binds the idempotency key to the method and todo being updated", async () => {
+      for (const [method, url] of [
+        ["PATCH", "/v1/todos/todo_1"],
+        ["PATCH", "/v1/todos/todo_2"],
+        ["PUT", "/v1/todos/todo_2"],
+      ] as const) {
+        await app.inject({
+          method,
+          url,
+          headers: authHeaders({ "idempotency-key": "same-key" }),
+          payload: { completed: true },
+        });
+      }
+
+      const scoped = mocks.runIdempotent.mock.calls.map((call) => call[2]);
+      expect(scoped).toEqual([
+        { request: "PATCH /v1/todos/todo_1", body: { completed: true } },
+        { request: "PATCH /v1/todos/todo_2", body: { completed: true } },
+        { request: "PUT /v1/todos/todo_2", body: { completed: true } },
+      ]);
     });
 
     it("returns not found from an update", async () => {

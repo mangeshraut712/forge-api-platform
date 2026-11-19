@@ -37,6 +37,15 @@ function getIdempotencyKey(req: FastifyRequest): string | undefined {
 }
 
 /**
+ * What an idempotency key is bound to: the request target as well as the body,
+ * so reusing a key on another todo or route is a conflict, not a replay of an
+ * unrelated response.
+ */
+function idempotentRequest(method: string, target: string, body: unknown) {
+  return { request: `${method} ${target}`, body: body ?? null };
+}
+
+/**
  * Shared handler for PUT and PATCH — validates the body, checks idempotency,
  * performs the update, and stores the response for future replays.
  */
@@ -54,7 +63,7 @@ async function handleTodoUpdate(req: FastifyRequest, reply: FastifyReply) {
     const result = await runIdempotent(
       projectId,
       idempotencyKey,
-      req.body,
+      idempotentRequest(req.method, `/v1/todos/${id}`, req.body),
       async (tx) => ({
         responseCode: 200,
         responseBody: await updateTodo(projectId, id, parsed.data, tx),
@@ -113,7 +122,7 @@ export async function todoRoutes(app: FastifyInstance): Promise<void> {
         const result = await runIdempotent(
           projectId,
           idempotencyKey,
-          req.body,
+          idempotentRequest("POST", "/v1/todos", req.body),
           async (tx) => ({
             responseCode: 201,
             responseBody: await createTodo(projectId, parsed.data, tx),
