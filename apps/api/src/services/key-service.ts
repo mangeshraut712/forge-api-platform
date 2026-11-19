@@ -162,13 +162,24 @@ export async function rotateApiKey(
 
   const rawKey = generateKey(existing.environment);
   const now = new Date();
-  const graceEndsAt = new Date(now.getTime() + graceDays * 24 * 60 * 60 * 1000);
+  const requestedGraceEnd = new Date(
+    now.getTime() + graceDays * 24 * 60 * 60 * 1000,
+  );
+  // Re-rotating a key already in its grace window must not extend that grace
+  // or move its original revocation time.
+  const graceEndsAt =
+    existing.revokedAt && existing.graceEndsAt
+      ? new Date(
+          Math.min(existing.graceEndsAt.getTime(), requestedGraceEnd.getTime()),
+        )
+      : requestedGraceEnd;
+  const revokedAt = existing.revokedAt ?? now;
 
   const record = await prisma.$transaction(async (tx) => {
     // Revoke old key but keep it usable until graceEndsAt
     await tx.apiKey.update({
       where: { id: keyId },
-      data: { revokedAt: now, graceEndsAt },
+      data: { revokedAt, graceEndsAt },
     });
 
     // Create new key linked to the old one

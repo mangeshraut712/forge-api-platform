@@ -506,7 +506,13 @@ describe("key service", () => {
       await expect(rotateApiKey("proj_1", "key_1")).resolves.toMatchObject({
         record: { id: "key_2" },
       });
-      expect(tx.apiKey.update).toHaveBeenCalled();
+      expect(tx.apiKey.update).toHaveBeenCalledWith({
+        where: { id: "key_1" },
+        data: {
+          revokedAt: new Date("2026-05-25T00:00:00.000Z"),
+          graceEndsAt: new Date("2026-06-02T00:00:00.000Z"),
+        },
+      });
     });
   });
 });
