@@ -109,11 +109,18 @@ jobs:
       - name: Verify deployment migrations
         run: pnpm db:migrate:deploy
 
-      - name: Typecheck
-        run: pnpm typecheck
-
+      # Each package that builds with `tsc -p tsconfig.json` already gets the
+      # same check as its `tsc -p tsconfig.json --noEmit` typecheck, so
+      # running both did the work twice. The script lists the packages the
+      # build doesn't cover (today the dashboard, whose `next build` skips
+      # *.test.* files, and tests/, which has no build), and their typecheck
+      # runs right after the build. Any package it can't prove covered gets
+      # its typecheck run.
       - name: Build
         run: pnpm build
+
+      - name: Typecheck packages the build doesn't cover
+        run: pnpm exec turbo run typecheck $(node .github/scripts/typecheck-gaps.mjs)
 
       - name: Test
         run: pnpm test
