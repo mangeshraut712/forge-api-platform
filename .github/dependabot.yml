@@ -1,0 +1,36 @@
+version: 2
+
+# Version updates stay off (they were turned off on purpose in 87a71f8).
+# `open-pull-requests-limit: 0` keeps them off. Security updates don't
+# count against that limit, so every advisory still gets a fix.
+#
+# Without groups, each advisory opened its own PR at the same moment, and
+# those runs queued behind each other on the free runners. The groups below
+# batch the fixes for each ecosystem into one PR per run, covering every
+# workspace directory.
+updates:
+  - package-ecosystem: npm
+    directories:
+      - "/"
+      - "/apps/*"
+      - "/packages/*"
+      - "/tests"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
+    groups:
+      npm-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
+    groups:
+      actions-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
