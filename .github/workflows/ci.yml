@@ -5,10 +5,6 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
-  # Ready for a merge queue if this repo ever gets one (queues need an
-  # organization-owned repo). The full suite runs for every event; nothing
-  # below is path-filtered or selected.
-  merge_group:
   workflow_dispatch:
 
 permissions:
@@ -43,15 +39,22 @@ jobs:
       # can't report healthy before the real server is listening.
       - name: Start Postgres and Redis
         run: |
-          docker run -d --name postgres -p 5432:5432 \
+          # Each start runs in the background; its exit code is written to a
+          # file so the wait step fails at once (with the docker output) if a
+          # pull or start fails, instead of polling out its window.
+          (docker run -d --name postgres -p 5432:5432 \
             -e POSTGRES_USER=forge -e POSTGRES_PASSWORD=forge -e POSTGRES_DB=forge \
             --health-cmd "pg_isready -h 127.0.0.1 -U forge -d forge" \
             --health-interval 1s --health-timeout 5s --health-retries 50 \
-            postgres:16-alpine > "$RUNNER_TEMP/postgres-start.log" 2>&1 &
-          docker run -d --name redis -p 6379:6379 \
+            postgres:16-alpine > "$RUNNER_TEMP/postgres-start.log" 2>&1 &&
+            echo 0 > "$RUNNER_TEMP/postgres-start.rc" ||
+            echo $? > "$RUNNER_TEMP/postgres-start.rc") &
+          (docker run -d --name redis -p 6379:6379 \
             --health-cmd "redis-cli ping" \
             --health-interval 1s --health-timeout 5s --health-retries 50 \
-            redis:7-alpine > "$RUNNER_TEMP/redis-start.log" 2>&1 &
+            redis:7-alpine > "$RUNNER_TEMP/redis-start.log" 2>&1 &&
+            echo 0 > "$RUNNER_TEMP/redis-start.rc" ||
+            echo $? > "$RUNNER_TEMP/redis-start.rc") &
 
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -85,6 +88,12 @@ jobs:
         run: |
           for svc in postgres redis; do
             for _ in $(seq 1 50); do
+              rc=$(cat "$RUNNER_TEMP/$svc-start.rc" 2>/dev/null || true)
+              if [ -n "$rc" ] && [ "$rc" != 0 ]; then
+                echo "::error::docker run for $svc exited $rc"
+                cat "$RUNNER_TEMP/$svc-start.log"
+                exit 1
+              fi
               status=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{end}}' "$svc" 2>/dev/null || true)
               [ "$status" = healthy ] && break
               sleep 1
