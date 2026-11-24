@@ -5,6 +5,10 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # Ready for a merge queue if this repo ever gets one (queues need an
+  # organization-owned repo). The full suite runs for every event; nothing
+  # below is path-filtered or selected.
+  merge_group:
   workflow_dispatch:
 
 permissions:
@@ -24,34 +28,30 @@ jobs:
       REDIS_URL: redis://localhost:6379
       API_KEY_HASH_PEPPER: ci-only-pepper-not-a-secret
       NODE_ENV: test
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: forge
-          POSTGRES_PASSWORD: forge
-          POSTGRES_DB: forge
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U forge -d forge"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
     strategy:
       matrix:
         node-version: [22]
 
     steps:
+      # Same images and credentials as the old `services:` block, but started
+      # in the background so the image pulls and database boot overlap with
+      # checkout, install, lint, typecheck and build instead of blocking the
+      # job for ~22s in "Initialize containers". Only migrations and tests
+      # need them, and the step before those waits until both are healthy.
+      # pg_isready goes over TCP so the entrypoint's socket-only init server
+      # can't report healthy before the real server is listening.
+      - name: Start Postgres and Redis
+        run: |
+          docker run -d --name postgres -p 5432:5432 \
+            -e POSTGRES_USER=forge -e POSTGRES_PASSWORD=forge -e POSTGRES_DB=forge \
+            --health-cmd "pg_isready -h 127.0.0.1 -U forge -d forge" \
+            --health-interval 1s --health-timeout 5s --health-retries 50 \
+            postgres:16-alpine > "$RUNNER_TEMP/postgres-start.log" 2>&1 &
+          docker run -d --name redis -p 6379:6379 \
+            --health-cmd "redis-cli ping" \
+            --health-interval 1s --health-timeout 5s --health-retries 50 \
+            redis:7-alpine > "$RUNNER_TEMP/redis-start.log" 2>&1 &
+
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -68,6 +68,16 @@ jobs:
           node-version: ${{ matrix.node-version }}
           cache: pnpm
 
+      # Next.js's own incremental compiler cache. It speeds up `next build`;
+      # the build, its type check and every test still run on every event.
+      - name: Restore Next.js build cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: apps/dashboard/.next/cache
+          key: nextjs-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('apps/dashboard/**', 'packages/**', '!**/node_modules/**', '!**/.next/**') }}
+          restore-keys: |
+            nextjs-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
@@ -77,17 +87,32 @@ jobs:
       - name: Generate Prisma client
         run: pnpm db:generate
 
-      - name: Verify deployment migrations
-        run: pnpm db:migrate:deploy
-
       - name: Lint and format check
         run: pnpm lint
 
-      - name: Typecheck
-        run: pnpm typecheck
+      # One turbo invocation instead of two, so package builds are shared and
+      # typecheck runs alongside the dashboard build instead of before it.
+      - name: Typecheck and build
+        run: pnpm exec turbo run typecheck build
 
-      - name: Build
-        run: pnpm build
+      - name: Wait for Postgres and Redis
+        run: |
+          for svc in postgres redis; do
+            for _ in $(seq 1 50); do
+              status=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{end}}' "$svc" 2>/dev/null || true)
+              [ "$status" = healthy ] && break
+              sleep 1
+            done
+            if [ "$status" != healthy ]; then
+              echo "::error::$svc did not become healthy (status: ${status:-missing})"
+              cat "$RUNNER_TEMP/$svc-start.log" || true
+              docker logs "$svc" || true
+              exit 1
+            fi
+          done
+
+      - name: Verify deployment migrations
+        run: pnpm db:migrate:deploy
 
       - name: Test
         run: pnpm test
