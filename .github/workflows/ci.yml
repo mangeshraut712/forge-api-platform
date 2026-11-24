@@ -68,16 +68,6 @@ jobs:
           node-version: ${{ matrix.node-version }}
           cache: pnpm
 
-      # Next.js's own incremental compiler cache. It speeds up `next build`;
-      # the build, its type check and every test still run on every event.
-      - name: Restore Next.js build cache
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: apps/dashboard/.next/cache
-          key: nextjs-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('apps/dashboard/**', 'packages/**', '!**/node_modules/**', '!**/.next/**') }}
-          restore-keys: |
-            nextjs-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
-
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
