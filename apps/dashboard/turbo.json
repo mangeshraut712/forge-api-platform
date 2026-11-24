@@ -2,9 +2,9 @@
   "$schema": "https://turbo.build/schema.json",
   "extends": ["//"],
   "tasks": {
-    "typecheck": {
-      "dependsOn": ["^build", "build"],
-      "outputs": []
+    "build": {
+      "dependsOn": ["^build", "typecheck"],
+      "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
     }
   }
 }
