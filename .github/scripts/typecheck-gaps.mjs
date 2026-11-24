@@ -1,8 +1,9 @@
 // Prints turbo --filter flags for the workspace packages whose `typecheck`
 // is not already covered by their `build`.
 //
-// A build covers typecheck only when both run tsc on the same tsconfig and
-// typecheck just adds --noEmit. tsc then sees the same files with the same
+// A build covers typecheck only when typecheck is exactly
+// `tsc -p <config> --noEmit` and the build ends in exactly `tsc -p <config>`
+// with the same config. tsc then sees the same files with the same
 // options and exits non-zero on the same errors. Any other package gets its
 // typecheck run explicitly, so a new package or a changed script fails
 // safe. Today that's the dashboard (`next build` skips type errors in
@@ -26,11 +27,12 @@ for (const dir of dirs) {
   const pkg = JSON.parse(readFileSync(file, "utf8"));
   const { build, typecheck } = pkg.scripts ?? {};
   if (!typecheck) continue;
-  const tscOn = (cmd) => cmd?.match(/(?:^|&&\s*)tsc -p (\S+)(.*)$/);
-  const b = tscOn(build);
-  const t = tscOn(typecheck);
-  const covered =
-    b && t && b[1] === t[1] && b[2].trim() === "" && t[2].trim() === "--noEmit";
+  // typecheck must be exactly `tsc -p <config> --noEmit`. Build must end
+  // with exactly `tsc -p <config>`. Steps before it (e.g. prisma generate)
+  // are extra build work and don't change what tsc checks.
+  const t = typecheck.match(/^tsc -p (\S+) --noEmit$/);
+  const b = build?.match(/^(?:.+&&\s*)?tsc -p (\S+)$/);
+  const covered = Boolean(t && b && t[1] === b[1]);
   if (!covered) flags.push(`--filter=${pkg.name}`);
 }
 process.stdout.write(flags.join(" "));
