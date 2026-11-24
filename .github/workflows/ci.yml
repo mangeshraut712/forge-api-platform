@@ -37,7 +37,7 @@ jobs:
       # in the background so the image pulls and database boot overlap with
       # checkout, install, lint, typecheck and build instead of blocking the
       # job for ~22s in "Initialize containers". Only migrations and tests
-      # need them, and the step before those waits until both are healthy.
+      # need them, and the wait step before those blocks until both are healthy.
       # pg_isready goes over TCP so the entrypoint's socket-only init server
       # can't report healthy before the real server is listening.
       - name: Start Postgres and Redis
@@ -90,11 +90,6 @@ jobs:
       - name: Lint and format check
         run: pnpm lint
 
-      # One turbo invocation instead of two, so package builds are shared and
-      # typecheck runs alongside the dashboard build instead of before it.
-      - name: Typecheck and build
-        run: pnpm exec turbo run typecheck build
-
       - name: Wait for Postgres and Redis
         run: |
           for svc in postgres redis; do
@@ -114,5 +109,9 @@ jobs:
       - name: Verify deployment migrations
         run: pnpm db:migrate:deploy
 
-      - name: Test
-        run: pnpm test
+      # One turbo invocation instead of three, so package builds are shared
+      # and typecheck and the package test suites run alongside the
+      # dashboard build instead of strictly after it. Every task still runs;
+      # turbo fails the step if any one of them fails.
+      - name: Typecheck, build, and test
+        run: pnpm exec turbo run typecheck build test
